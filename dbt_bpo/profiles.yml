@@ -1,0 +1,12 @@
+dbt_bpo:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: postgres
+      pass: postgres
+      dbname: bpo_db
+      schema: public
+      threads: 4
