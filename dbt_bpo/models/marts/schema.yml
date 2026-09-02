@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: dim_campaign
+    description: "Campaign dimension table"
+    columns:
+      - name: campaign_id
+        description: "Primary key for campaign"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_agent
+    description: "Agent dimension table"
+    columns:
+      - name: agent_id
+        description: "Primary key for agent"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_channel
+    description: "Channel dimension table"
+    columns:
+      - name: channel_id
+        description: "Primary key for channel"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_date
+    description: "Date dimension table"
+    columns:
+      - name: date_key
+        description: "Primary key for date dimension"
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_interactions
+    description: "Interaction fact table"
+    columns:
+      - name: interaction_id
+        description: "Primary key for interaction"
+        tests:
+          - unique
+          - not_null
+      - name: campaign_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_campaign')
+              field: campaign_id
+      - name: agent_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_agent')
+              field: agent_id
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+
+  - name: weekly_campaign_kpis
+    description: "Weekly campaign level pre-aggregated KPIs"
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+      - name: week_name
+        tests:
+          - not_null
