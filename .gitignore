@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build outputs
+dashboard/.next/
+dashboard/out/
+
+# dbt artifacts
+dbt_bpo/target/
+dbt_bpo/dbt_packages/
+dbt_bpo/logs/
+dbt_bpo/.user.yml
+
+# Environment & local secrets
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
