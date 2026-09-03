@@ -67,7 +67,7 @@ export async function getKPIOverview(
         NULLIF(SUM(total_calls_evaluated), 0)) * 100.0, 2
       )::FLOAT AS overall_phone_sla_pct,
       
-      COALESCE(AVG(target_phone_sla_pct), 90.0)::FLOAT AS target_phone_sla_pct,
+      AVG(target_phone_sla_pct)::FLOAT AS target_phone_sla_pct,
       
       COALESCE(SUM(csat_satisfied_count), 0)::INT AS csat_satisfied_count,
       COALESCE(SUM(csat_total_responses), 0)::INT AS csat_total_responses,
@@ -77,7 +77,7 @@ export async function getKPIOverview(
         NULLIF(SUM(csat_total_responses), 0)) * 100.0, 2
       )::FLOAT AS overall_csat_pct,
       
-      COALESCE(AVG(target_csat_pct), 45.0)::FLOAT AS target_csat_pct,
+      AVG(target_csat_pct)::FLOAT AS target_csat_pct,
       
       COALESCE(ROUND(AVG(avg_email_first_reply_mins)::NUMERIC, 2), 0)::FLOAT AS avg_email_first_reply_mins,
       COALESCE(ROUND(AVG(avg_email_resolution_mins)::NUMERIC, 2), 0)::FLOAT AS avg_email_resolution_mins
@@ -97,11 +97,11 @@ export async function getKPIOverview(
     calls_under_60s_count: row.calls_under_60s_count || 0,
     total_calls_evaluated: row.total_calls_evaluated || 0,
     overall_phone_sla_pct: row.overall_phone_sla_pct || 0,
-    target_phone_sla_pct: row.target_phone_sla_pct || 90.0,
+    target_phone_sla_pct: row.target_phone_sla_pct !== null && row.target_phone_sla_pct !== undefined ? Number(row.target_phone_sla_pct) : null,
     csat_satisfied_count: row.csat_satisfied_count || 0,
     csat_total_responses: row.csat_total_responses || 0,
     overall_csat_pct: row.overall_csat_pct || 0,
-    target_csat_pct: row.target_csat_pct || 45.0,
+    target_csat_pct: row.target_csat_pct !== null && row.target_csat_pct !== undefined ? Number(row.target_csat_pct) : null,
     avg_email_first_reply_mins: row.avg_email_first_reply_mins || 0,
     avg_email_resolution_mins: row.avg_email_resolution_mins || 0,
   };

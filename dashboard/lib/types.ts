@@ -1,8 +1,19 @@
 export type UserRole = 'management' | 'standard';
 
 export interface UserSession {
+  userId?: string;
+  userName?: string;
   role: UserRole;
   campaignId?: string; // Assigned campaign for standard role
+}
+
+export interface MockUserProfile {
+  id: string;
+  name: string;
+  title: string;
+  role: UserRole;
+  campaignId?: string;
+  campaignName?: string;
 }
 
 export interface CampaignOption {
@@ -22,13 +33,13 @@ export interface KPIOverviewStats {
   calls_under_60s_count: number;
   total_calls_evaluated: number;
   overall_phone_sla_pct: number;
-  target_phone_sla_pct: number;
+  target_phone_sla_pct: number | null;
   
   // CSAT
   csat_satisfied_count: number;
   csat_total_responses: number;
   overall_csat_pct: number;
-  target_csat_pct: number;
+  target_csat_pct: number | null;
 
   // Email averages
   avg_email_first_reply_mins: number;
@@ -47,11 +58,11 @@ export interface WeeklyKpiTrend {
   email_volume: number;
   ticket_volume: number;
   chat_volume: number;
-  actual_phone_sla_pct: number;
-  target_phone_sla_pct: number;
-  is_phone_sla_met: number;
-  actual_csat_pct: number;
-  target_csat_pct: number;
+  actual_phone_sla_pct: number | null;
+  target_phone_sla_pct: number | null;
+  is_phone_sla_met: number | null;
+  actual_csat_pct: number | null;
+  target_csat_pct: number | null;
   avg_email_first_reply_mins: number;
   avg_email_resolution_mins: number;
 }
@@ -81,3 +92,4 @@ export interface CampaignTarget {
   target_value: number;
   unit: string;
 }
+

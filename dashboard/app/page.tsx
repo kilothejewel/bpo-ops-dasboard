@@ -51,19 +51,26 @@ export default function Dashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch Dashboard Data from API
-  const fetchData = useCallback(async () => {
+  // Fetch Dashboard Data from API.
+  // NOTE: role/campaignId are no longer sent here. They travel via a signed,
+  // httpOnly session cookie (see /api/session + lib/session.ts) that the
+  // server verifies — this call only narrows the query WITHIN whatever
+  // access the session already grants.
+  const fetchData = useCallback(async (campaignFilter: string, channel: string) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({
-        role,
-        userCampaignId,
-        campaignId: role === 'standard' ? userCampaignId : selectedCampaignId,
-        channel: selectedChannel,
+        campaignId: campaignFilter,
+        channel,
       });
 
-      const res = await fetch(`/api/dashboard?${params.toString()}`);
+      const res = await fetch(`/api/dashboard?${params.toString()}`, {
+        credentials: 'same-origin',
+      });
+      if (res.status === 401) {
+        throw new Error('Session not established. Please refresh the page.');
+      }
       if (!res.ok) {
         throw new Error(`Server returned ${res.status}`);
       }
@@ -80,25 +87,74 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [role, userCampaignId, selectedCampaignId, selectedChannel]);
+  }, []);
 
+  // Establishes (or re-establishes) the server-side session for a chosen
+  // role/campaign, then refetches data under that session.
+  //
+  // This is the demo stand-in for "log in as this identity" — see
+  // app/api/session/route.ts for the important caveat that this does not
+  // verify any real credentials. It exists to close the specific
+  // vulnerability this project had (role read straight from a client-
+  // editable query param), not to provide production authentication.
+  const establishSession = useCallback(
+    async (newRole: UserRole, newCampaignId: string, campaignFilter: string, channel: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ role: newRole, campaignId: newCampaignId }),
+        });
+        if (!res.ok) {
+          throw new Error(`Session could not be established (${res.status})`);
+        }
+        await fetchData(campaignFilter, channel);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || 'Failed to establish session');
+        setLoading(false);
+      }
+    },
+    [fetchData]
+  );
+
+  // Bootstrap: establish an initial session on first load.
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    establishSession('management', userCampaignId, 'ALL', 'ALL');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Sync selected campaign when switching to standard role
+  // Switching role re-establishes the session (the actual security
+  // boundary); switching the management campaign filter or channel filter
+  // just narrows the query within the already-established session.
   const handleRoleChange = (newRole: UserRole) => {
     setRole(newRole);
-    if (newRole === 'standard') {
-      setSelectedCampaignId(userCampaignId);
-    } else {
-      setSelectedCampaignId('ALL');
-    }
+    const nextCampaignFilter = newRole === 'standard' ? userCampaignId : 'ALL';
+    setSelectedCampaignId(nextCampaignFilter);
+    establishSession(newRole, userCampaignId, nextCampaignFilter, selectedChannel);
   };
 
   const handleStandardCampaignChange = (cId: string) => {
     setUserCampaignId(cId);
     setSelectedCampaignId(cId);
+    establishSession('standard', cId, cId, selectedChannel);
+  };
+
+  const handleManagementCampaignChange = (cId: string) => {
+    setSelectedCampaignId(cId);
+    fetchData(cId, selectedChannel);
+  };
+
+  const handleChannelChange = (channel: string) => {
+    setSelectedChannel(channel);
+    fetchData(role === 'standard' ? userCampaignId : selectedCampaignId, channel);
+  };
+
+  const handleRefresh = () => {
+    fetchData(role === 'standard' ? userCampaignId : selectedCampaignId, selectedChannel);
   };
 
   return (
@@ -127,7 +183,8 @@ export default function Dashboard() {
           <div className="flex items-center bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
             <button
               onClick={() => handleRoleChange('management')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50 ${
                 role === 'management'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                   : 'text-slate-400 hover:text-white'
@@ -138,7 +195,8 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => handleRoleChange('standard')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50 ${
                 role === 'standard'
                   ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
                   : 'text-slate-400 hover:text-white'
@@ -150,7 +208,7 @@ export default function Dashboard() {
           </div>
 
           <button
-            onClick={fetchData}
+            onClick={handleRefresh}
             disabled={loading}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
             title="Refresh Metrics"
@@ -185,7 +243,8 @@ export default function Dashboard() {
               <select
                 value={userCampaignId}
                 onChange={(e) => handleStandardCampaignChange(e.target.value)}
-                className="bg-slate-900 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                disabled={loading}
+                className="bg-slate-900 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:opacity-50"
               >
                 {campaigns.map((c) => (
                   <option key={c.campaign_id} value={c.campaign_id}>
@@ -203,8 +262,9 @@ export default function Dashboard() {
               <span className="text-xs text-slate-400 font-medium">Campaign:</span>
               <select
                 value={selectedCampaignId}
-                onChange={(e) => setSelectedCampaignId(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500"
+                onChange={(e) => handleManagementCampaignChange(e.target.value)}
+                disabled={loading}
+                className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
               >
                 <option value="ALL">All Campaigns (Cross-Campaign)</option>
                 {campaigns.map((c) => (
@@ -221,8 +281,9 @@ export default function Dashboard() {
             <span className="text-xs text-slate-400 font-medium">Channel:</span>
             <select
               value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value)}
-              className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500"
+              onChange={(e) => handleChannelChange(e.target.value)}
+              disabled={loading}
+              className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
             >
               <option value="ALL">All Channels</option>
               <option value="phone">Phone</option>
@@ -263,11 +324,11 @@ export default function Dashboard() {
               {kpiOverview ? `${kpiOverview.overall_phone_sla_pct}%` : '--'}
             </span>
             <div className={`px-2 py-0.5 rounded text-xs font-bold ${
-              kpiOverview && kpiOverview.overall_phone_sla_pct >= kpiOverview.target_phone_sla_pct
+              kpiOverview && kpiOverview.target_phone_sla_pct !== null && kpiOverview.overall_phone_sla_pct >= kpiOverview.target_phone_sla_pct
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
             }`}>
-              Target: {kpiOverview ? `${kpiOverview.target_phone_sla_pct}%` : '90%'}
+              Target: {kpiOverview && kpiOverview.target_phone_sla_pct !== null ? `${kpiOverview.target_phone_sla_pct}%` : 'N/A'}
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
@@ -293,7 +354,7 @@ export default function Dashboard() {
               {kpiOverview ? `${kpiOverview.overall_csat_pct}%` : '--'}
             </span>
             <div className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              Confirmed Baseline: {kpiOverview ? `${kpiOverview.target_csat_pct}%` : '45%'}
+              Confirmed Baseline: {kpiOverview && kpiOverview.target_csat_pct !== null ? `${kpiOverview.target_csat_pct}%` : 'N/A'}
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
