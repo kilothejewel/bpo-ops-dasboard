@@ -12,7 +12,7 @@ SELECT
     full_date AS date,
     EXTRACT(WEEK FROM full_date)::INT AS week,
     EXTRACT(MONTH FROM full_date)::INT AS month,
-    EXTRACT(YEAR FROM full_date)::INT AS year,
+    EXTRACT(ISOYEAR FROM full_date)::INT AS year,
     TO_CHAR(full_date, 'YYYY-"W"IW') AS week_name,
     TO_CHAR(full_date, 'Month') AS month_name
 FROM date_series

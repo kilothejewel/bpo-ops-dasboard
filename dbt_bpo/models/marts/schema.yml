@@ -27,6 +27,13 @@ models:
         tests:
           - unique
           - not_null
+      - name: channel_name
+        description: "Standardized channel name"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['phone', 'email', 'ticket', 'chat']
 
   - name: dim_date
     description: "Date dimension table"
@@ -49,20 +56,60 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_campaign')
-              field: campaign_id
+              arguments:
+                to: ref('dim_campaign')
+                field: campaign_id
       - name: agent_id
         tests:
           - not_null
           - relationships:
-              to: ref('dim_agent')
-              field: agent_id
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
       - name: date_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_date')
-              field: date_key
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: channel
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['phone', 'email', 'ticket', 'chat']
+      - name: is_call_answered_under_1min
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+              config:
+                where: "is_call_answered_under_1min IS NOT NULL"
+      - name: is_csat_satisfied
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+              config:
+                where: "is_csat_satisfied IS NOT NULL"
+
+  - name: campaign_targets
+    description: "Per-campaign, per-metric SLA/KPI target thresholds — the join source for dynamic SLA calculation. Must never have more than one target row per (campaign_id, metric_name), or the LEFT JOINs in weekly_campaign_kpis will silently fan out rows."
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+      - name: metric_name
+        tests:
+          - not_null
+      - name: target_value
+        tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [campaign_id, metric_name]
 
   - name: weekly_campaign_kpis
     description: "Weekly campaign level pre-aggregated KPIs"
@@ -73,3 +120,32 @@ models:
       - name: week_name
         tests:
           - not_null
+      - name: actual_phone_sla_pct
+        description: "Phone SLA adherence % (calls answered <=60s / total calls evaluated). Null when a campaign/week has no evaluated phone calls."
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+                inclusive: true
+              config:
+                where: "actual_phone_sla_pct IS NOT NULL"
+      - name: actual_csat_pct
+        description: "CSAT top-box % (ratings 4-5 / total rated interactions). Null when a campaign/week has no rated interactions."
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+                inclusive: true
+              config:
+                where: "actual_csat_pct IS NOT NULL"
+      - name: is_phone_sla_met
+        description: "1 if actual_phone_sla_pct meets/exceeds target_phone_sla_pct, 0 if not, NULL if no target is defined for this campaign/metric — deliberately distinct from a real miss."
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+              config:
+                where: "is_phone_sla_met IS NOT NULL"

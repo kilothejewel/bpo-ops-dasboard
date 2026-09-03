@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: stg_interactions
+    description: "Cleaned, standardized, and deduplicated interactions (Silver staging layer)"
+    columns:
+      - name: interaction_id
+        description: "Primary key for interaction. Deduplication via ROW_NUMBER() in stg_interactions must guarantee absolute uniqueness."
+        tests:
+          - unique
+          - not_null
+      - name: campaign_id
+        description: "Foreign key to campaign"
+        tests:
+          - not_null
+      - name: agent_id
+        description: "Foreign key to agent"
+        tests:
+          - not_null
+      - name: channel
+        description: "Standardized lowercase interaction channel name"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['phone', 'email', 'ticket', 'chat']
+
+  - name: stg_campaigns
+    description: "Normalized campaigns staging table"
+    columns:
+      - name: campaign_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_agents
+    description: "Normalized agents staging table"
+    columns:
+      - name: agent_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_channels
+    description: "Normalized channels staging table"
+    columns:
+      - name: channel_id
+        tests:
+          - unique
+          - not_null
+      - name: channel_name
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['phone', 'email', 'ticket', 'chat']
+
+  - name: stg_campaign_targets
+    description: "Campaign SLA target thresholds staging table"
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+      - name: metric_name
+        tests:
+          - not_null
+      - name: target_value
+        tests:
+          - not_null
