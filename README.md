@@ -41,17 +41,23 @@ All metrics are calculated strictly according to confirmed business specificatio
 | **Volume Counts** | *No Target* | `COUNT(interaction_id)` per channel (Phone, Email, Ticket, Chat) | Trend/count breakdown over time. |
 
 > [!IMPORTANT]
-> **Dynamic Target Joining Principle:**  
+> **Dynamic Target Joining & Boundary Correctness:**  
 > SLA adherence is calculated dynamically in dbt (`weekly_campaign_kpis.sql`) by joining `fct_interactions` with `campaign_targets` on `campaign_id` and `metric_name`. **No SLA thresholds are hardcoded in application or dbt SQL code.** Changing a campaign target only requires updating a target record in the database, never a code change.
+> 
+> Furthermore, metrics are computed and rounded once within a dedicated CTE (`weekly_computed`) before comparison, ensuring displayed values and threshold flags (`is_phone_sla_met`) never diverge at decimal boundaries. If a campaign lacks a target definition for a metric, the SLA status explicitly evaluates to `NULL` rather than a false failure (`0`), allowing the UI to accurately render "No Target Set".
 
 ---
 
 ## 🔒 Access Model & Role-Based Security (RBAC)
 
-Security is implemented at the server level via Next.js typed data access layer (`lib/data-access.ts`), ensuring client-side filtering alone is never relied upon for data access control:
+Security is implemented with strict defense-in-depth across the API route (`app/api/dashboard/route.ts`) and the typed Data Access Layer (`lib/data-access.ts`):
 
-- **Management Role (`management`)**: Full cross-campaign visibility across all 15 campaigns with interactive campaign filtering.
-- **Standard Role (`standard`)**: Restricted server-side access enforcing `WHERE campaign_id = $1` to display only the user's assigned campaign.
+- **Verified Identity Resolution (`lib/auth.ts`)**: Rather than blindly trusting client-supplied query parameters, the application resolves user identity from session tokens / cookies (`x-session-token` / `bpo_session_token`). In an enterprise target state, this maps to **Azure Active Directory (Microsoft Entra ID)** signed JWT bearer tokens.
+- **Fail-Closed Principle**: If an identity token is missing, unrecognized, or corrupted, the system **fails closed** to the most restricted standard tier sandbox, never defaulting open to cross-campaign management access.
+- **Server-Enforced Query Shaping**:
+  - **Management Role (`management`)**: Full cross-campaign visibility with optional single-campaign drill-down.
+  - **Standard Role (`standard`)**: Restricted server-side query execution enforcing `WHERE campaign_id = $1` pinned strictly to the user's authenticated campaign claim (`session.campaignId`). Client-requested campaign IDs are ignored.
+- **SQL Injection Defense & Input Validation**: Every query is fully parameterized (`$1`, `$2`), and inputs undergo strict allowlisting (channel allowlist: `ALL`, `phone`, `email`, `ticket`, `chat`) and regex format checks. Internal database error messages are sanitized server-side to prevent schema or connection string leakage.
 
 ---
 
@@ -61,13 +67,13 @@ While this Stage 2 exercise is implemented using a self-hosted stack (PostgreSQL
 
 | Local Self-Hosted Stack | Production Azure Architecture | Rationale & Trade-offs |
 |---|---|---|
-| **Python Generator (`generate_data.py`)** | **Azure Data Factory / Microsoft Fabric Pipelines** | Scheduled batch ingestion pipeline landing raw extracts into Azure Data Lake Storage Gen2. |
+| **Python Generator (`generate_data.py`)** | **Azure Data Factory / Microsoft Fabric Pipelines** | Scheduled batch ingestion pipeline landing raw extracts into Azure Data Lake Storage Gen2. Includes deterministic seeding (`Faker.seed(42)`). |
 | **PostgreSQL `raw` Schema** | **Azure Data Lake Storage Gen2 (ADLS Gen2 Bronze)** | Schema-on-read raw landing zone in parquet/JSON format. |
-| **dbt Staging Models (`staging`)** | **Synapse Analytics / Fabric Lakehouse (Silver)** | Standardized conformed silver tables with data quality checks applied. |
-| **dbt Marts Star Schema (`marts`)** | **Synapse Analytics / Fabric Lakehouse (Gold)** | Star schema optimized for analytical query performance and dimensional modeling. |
-| **PostgreSQL `campaign_targets`** | **Azure SQL Database / Fabric Metadata Table** | Dynamic threshold repository for SLA calculations. |
-| **Next.js Server API (`lib/data-access.ts`)** | **Power BI + Azure AD Row-Level Security (RLS)** | Dynamic reporting dashboard with Azure Active Directory user role filtering. |
-| **Local Connection Config** | **Azure Key Vault** | Secure management of database credentials and API secrets. |
+| **dbt Staging Models (`staging`)** | **Synapse Analytics / Fabric Lakehouse (Silver)** | Standardized conformed silver tables with deduplication and staging schema tests (`models/staging/schema.yml`). |
+| **dbt Marts Star Schema (`marts`)** | **Synapse Analytics / Fabric Lakehouse (Gold)** | Star schema optimized for analytical query performance and dimensional modeling (`models/marts/schema.yml`). |
+| **PostgreSQL `campaign_targets`** | **Azure SQL Database / Fabric Metadata Table** | Dynamic threshold repository for SLA calculations with composite uniqueness constraints. |
+| **Next.js Server API (`lib/data-access.ts`)** | **Power BI + Azure AD Row-Level Security (RLS)** | Server-side query shaping using session claims, mapping to Azure SQL RLS predicates (`SESSION_CONTEXT`). |
+| **Local Connection Config** | **Azure Key Vault & Managed Identities** | Local fallback credentials (`postgres`/`postgres`) are dev-only conveniences; production uses Azure Key Vault and Managed Identity (MSI). |
 
 ---
 
@@ -109,7 +115,7 @@ cd dbt_bpo
 dbt run --profiles-dir .
 dbt test --profiles-dir .
 ```
-*Verification*: Confirms 12 dbt models created in `public_staging` and `public_marts` schemas, and all 18 data quality tests pass (`unique`, `not_null`, `relationships`).
+*Verification*: Confirms 12 dbt models created in `public_staging` and `public_marts` schemas, and comprehensive data quality tests passing across both silver staging (asserting deduplication and channel normalization) and gold marts (referential integrity, dynamic target constraints, and metric ranges).
 
 ### 4. Manual SLA Calculation Verification
 Reconcile SLA output between raw data and dbt marts output:
