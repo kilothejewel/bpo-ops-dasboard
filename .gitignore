@@ -18,7 +18,14 @@ dbt_bpo/.user.yml
 .env.development.local
 .env.production.local
 
-# OS / IDE
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+
 .DS_Store
 Thumbs.db
 .vscode/

@@ -1,3 +1,4 @@
+import os
 import random
 import uuid
 from datetime import datetime, timedelta
@@ -7,15 +8,16 @@ from psycopg2.extras import execute_values
 from faker import Faker
 
 fake = Faker()
+Faker.seed(42)
 random.seed(42)
 
-# Database connection settings
+# Database connection settings with environment variable overrides (Azure Key Vault mapping in production)
 DB_CONFIG = {
-    "dbname": "bpo_db",
-    "user": "postgres",
-    "password": "postgres",
-    "host": "localhost",
-    "port": 5432
+    "dbname": os.environ.get("POSTGRES_DB", "bpo_db"),
+    "user": os.environ.get("POSTGRES_USER", "postgres"),
+    "password": os.environ.get("POSTGRES_PASSWORD", "postgres"),
+    "host": os.environ.get("POSTGRES_HOST", "localhost"),
+    "port": int(os.environ.get("POSTGRES_PORT", "5432"))
 }
 
 def get_db_connection():
