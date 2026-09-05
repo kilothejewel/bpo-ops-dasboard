@@ -1,48 +1,64 @@
 @import "tailwindcss";
 
+/*
+ * Deep Ocean Telemetry design system tokens (see DESIGN.md).
+ * Most of the palette maps 1:1 onto Tailwind's built-in slate / sky /
+ * emerald / red scales (confirmed by exact hex match), so those are used
+ * directly via standard utility classes throughout the app. Only the two
+ * darkest custom surfaces below have no default-palette equivalent.
+ */
+@theme {
+  --color-surface-0: #030712;
+  --color-surface-1: #090d16;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 antialiased font-sans min-h-screen selection:bg-cyan-500 selection:text-white;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-      radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
-    background-attachment: fixed;
+    @apply bg-surface-0 text-slate-100 antialiased font-sans min-h-screen selection:bg-sky-500/30 selection:text-sky-100;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
   }
 }
 
-.glass-card {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+/* Card envelope per DESIGN.md: surface-1 (#090D16), 1px crisp border,
+   no cast shadow — separation comes from tonal layering, not blur. */
+.panel {
+  background-color: var(--color-surface-1);
+  border: 1px solid #1e293b; /* slate-800 */
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
-.glass-card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.panel-hover {
+  transition: border-color 0.15s ease;
+}
+.panel-hover:hover {
+  border-color: #334155; /* slate-700 */
 }
 
-.glass-card-hover:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px 0 rgba(99, 102, 241, 0.15);
-}
-
-.custom-scrollbar::-webkit-scrollbar {
+/* Thin scrollbars matching the terminal aesthetic (no rounded pill thumbs
+   floating over content, no browser-default bulk). */
+::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+::-webkit-scrollbar-track {
+  background: var(--color-surface-0);
 }
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+::-webkit-scrollbar-thumb {
+  background: #1e293b; /* slate-800 */
   border-radius: 3px;
 }
+::-webkit-scrollbar-thumb:hover {
+  background: #334155; /* slate-700 */
+}
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+/* Respect reduced-motion preference for the sync/live pulse beacons. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping,
+  .animate-spin {
+    animation: none !important;
+  }
 }
