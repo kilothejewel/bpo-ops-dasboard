@@ -10,14 +10,25 @@ import {
   InteractionSort,
 } from './types';
 
+export class MissingCampaignAccessError extends Error {
+  constructor(message = 'Standard session missing campaignId') {
+    super(message);
+    this.name = 'MissingCampaignAccessError';
+  }
+}
+
 /**
  * Enforces server-side RBAC filtering based on session role.
  * Standard users can ONLY query their assigned campaign.
+ * Standard sessions without an assigned campaign fail closed and throw.
  * Management users can query all or filter by selected campaign.
  */
-function getEnforcedCampaignFilter(session: UserSession, requestedCampaignId?: string): string | null {
+export function getEnforcedCampaignFilter(session: UserSession, requestedCampaignId?: string): string | null {
   if (session.role === 'standard') {
-    return session.campaignId || 'CMP-101'; // Default fallback if standard
+    if (!session.campaignId) {
+      throw new MissingCampaignAccessError('Standard session missing campaignId');
+    }
+    return session.campaignId;
   }
   if (requestedCampaignId && requestedCampaignId !== 'ALL') {
     return requestedCampaignId;

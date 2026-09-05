@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCampaigns, getKPIOverview, getWeeklyTrendData, getGranularInteractions, getCampaignTargets } from '@/lib/data-access';
+import { 
+  getCampaigns, 
+  getKPIOverview, 
+  getWeeklyTrendData, 
+  getGranularInteractions, 
+  getCampaignTargets,
+  MissingCampaignAccessError,
+} from '@/lib/data-access';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
 import { InteractionSort } from '@/lib/types';
 
@@ -58,6 +65,14 @@ export async function GET(request: NextRequest) {
       targets,
     });
   } catch (error: unknown) {
+    if (error instanceof MissingCampaignAccessError) {
+      console.warn('RBAC fail-closed: standard session has no assigned campaignId');
+      return NextResponse.json(
+        { error: 'Forbidden: Standard session has no assigned campaign' },
+        { status: 403 }
+      );
+    }
+
     // Log full detail server-side only; never return raw DB/error internals
     // (column names, connection info, stack traces) to the client.
     console.error('Error fetching dashboard data:', error);

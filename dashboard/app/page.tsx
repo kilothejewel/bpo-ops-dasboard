@@ -254,7 +254,16 @@ export default function Dashboard() {
     [fetchData]
   );
 
+  const hasBootstrapped = useRef(false);
+
   useEffect(() => {
+    // React Strict Mode intentionally double-invokes effects in dev to
+    // surface bugs; without this guard, the initial session-establish call
+    // can fire twice concurrently and transiently race itself (visible as a
+    // brief 401 in the dev console that self-recovers). This guard makes
+    // bootstrap run exactly once regardless of Strict Mode.
+    if (hasBootstrapped.current) return;
+    hasBootstrapped.current = true;
     (async () => {
       try {
         const res = await fetch('/api/session', { credentials: 'same-origin' });
