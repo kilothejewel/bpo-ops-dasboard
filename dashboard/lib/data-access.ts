@@ -5,7 +5,9 @@ import {
   KPIOverviewStats, 
   WeeklyKpiTrend, 
   InteractionRecord, 
-  CampaignTarget 
+  CampaignTarget,
+  PaginatedInteractions,
+  InteractionSort,
 } from './types';
 
 /**
@@ -26,7 +28,7 @@ function getEnforcedCampaignFilter(session: UserSession, requestedCampaignId?: s
 export async function getCampaigns(session: UserSession): Promise<CampaignOption[]> {
   const enforcedId = getEnforcedCampaignFilter(session);
   let query = 'SELECT campaign_id, campaign_name, client_name FROM public_marts.dim_campaign';
-  const params: any[] = [];
+  const params: unknown[] = [];
 
   if (enforcedId) {
     query += ' WHERE campaign_id = $1';
@@ -43,7 +45,7 @@ export async function getKPIOverview(
   requestedCampaignId?: string
 ): Promise<KPIOverviewStats> {
   const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const params: any[] = [];
+  const params: unknown[] = [];
   let campaignWhereClause = '';
 
   if (enforcedCampaignId) {
@@ -112,7 +114,7 @@ export async function getWeeklyTrendData(
   requestedCampaignId?: string
 ): Promise<WeeklyKpiTrend[]> {
   const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const params: any[] = [];
+  const params: unknown[] = [];
   let campaignWhereClause = '';
 
   if (enforcedCampaignId) {
@@ -120,44 +122,58 @@ export async function getWeeklyTrendData(
     params.push(enforcedCampaignId);
   }
 
+  // Aggregated across campaigns per week when no single campaign is enforced,
+  // so the trend chart shows one line per week rather than one per
+  // campaign-week when management selects "All Campaigns".
   const query = `
     SELECT
-      campaign_id,
-      campaign_name,
       year,
       week,
-      week_name,
-      TO_CHAR(week_start_date, 'YYYY-MM-DD') AS week_start_date,
-      total_interactions,
-      call_volume,
-      email_volume,
-      ticket_volume,
-      chat_volume,
-      actual_phone_sla_pct::FLOAT,
-      target_phone_sla_pct::FLOAT,
-      is_phone_sla_met,
-      actual_csat_pct::FLOAT,
-      target_csat_pct::FLOAT,
-      avg_email_first_reply_mins::FLOAT,
-      avg_email_resolution_mins::FLOAT
+      MIN(week_name) AS week_name,
+      MIN(week_start_date)::TEXT AS week_start_date,
+      SUM(total_interactions)::INT AS total_interactions,
+      SUM(call_volume)::INT AS call_volume,
+      SUM(email_volume)::INT AS email_volume,
+      SUM(ticket_volume)::INT AS ticket_volume,
+      SUM(chat_volume)::INT AS chat_volume,
+      ROUND(
+        (SUM(calls_answered_under_1min_count)::NUMERIC / NULLIF(SUM(total_calls_evaluated), 0)) * 100.0, 2
+      )::FLOAT AS actual_phone_sla_pct,
+      AVG(target_phone_sla_pct)::FLOAT AS target_phone_sla_pct,
+      ROUND(
+        (SUM(csat_satisfied_count)::NUMERIC / NULLIF(SUM(csat_total_responses), 0)) * 100.0, 2
+      )::FLOAT AS actual_csat_pct,
+      AVG(target_csat_pct)::FLOAT AS target_csat_pct
     FROM public_marts.weekly_campaign_kpis
     ${campaignWhereClause}
-    ORDER BY year ASC, week ASC, campaign_name ASC
+    GROUP BY year, week
+    ORDER BY year ASC, week ASC
   `;
 
   const result = await pool.query(query, params);
   return result.rows;
 }
 
+const SORT_CLAUSES: Record<InteractionSort, string> = {
+  opened_desc: 'f.opened_at DESC',
+  opened_asc: 'f.opened_at ASC',
+  delay_asc: 'f.answer_time_seconds ASC NULLS LAST',
+  delay_desc: 'f.answer_time_seconds DESC NULLS LAST',
+  csat_desc: 'f.csat_score DESC NULLS LAST',
+  csat_asc: 'f.csat_score ASC NULLS LAST',
+};
+
 export async function getGranularInteractions(
   session: UserSession,
   requestedCampaignId?: string,
   channelFilter?: string,
-  limit: number = 50
-): Promise<InteractionRecord[]> {
+  page: number = 1,
+  pageSize: number = 8,
+  sort: InteractionSort = 'opened_desc'
+): Promise<PaginatedInteractions> {
   const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
   const conditions: string[] = [];
-  const params: any[] = [];
+  const params: unknown[] = [];
 
   if (enforcedCampaignId) {
     params.push(enforcedCampaignId);
@@ -170,10 +186,17 @@ export async function getGranularInteractions(
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const orderClause = SORT_CLAUSES[sort] || SORT_CLAUSES.opened_desc;
+  const safePage = Math.max(1, Math.floor(page));
+  const offset = (safePage - 1) * pageSize;
 
-  params.push(limit);
+  params.push(pageSize);
   const limitParamIndex = params.length;
+  params.push(offset);
+  const offsetParamIndex = params.length;
 
+  // COUNT(*) OVER() piggybacks the total row count onto the same query
+  // (one round trip) so the UI can render real pagination controls.
   const query = `
     SELECT
       f.interaction_id,
@@ -191,39 +214,88 @@ export async function getGranularInteractions(
       f.answer_time_seconds,
       f.first_reply_time_minutes::FLOAT,
       f.resolution_time_minutes::FLOAT,
-      f.is_call_answered_under_1min
+      f.is_call_answered_under_1min,
+      COUNT(*) OVER()::INT AS total_count
     FROM public_marts.fct_interactions f
     JOIN public_marts.dim_campaign c ON f.campaign_id = c.campaign_id
     JOIN public_marts.dim_agent a ON f.agent_id = a.agent_id
     ${whereClause}
-    ORDER BY f.opened_at DESC
-    LIMIT $${limitParamIndex}
+    ORDER BY ${orderClause}
+    LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
   `;
 
   const result = await pool.query(query, params);
-  return result.rows;
+  const total = result.rows[0]?.total_count ?? 0;
+  const rows: InteractionRecord[] = result.rows.map(({ total_count: _total_count, ...rest }) => rest);
+
+  return { rows, total, page: safePage, pageSize };
 }
+
+// Metrics where a HIGHER actual value is better (percentages: SLA %, CSAT %).
+const HIGHER_IS_BETTER = new Set(['calls_answered_under_1min_pct', 'csat_score_pct']);
 
 export async function getCampaignTargets(
   session: UserSession,
   requestedCampaignId?: string
 ): Promise<CampaignTarget[]> {
   const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const params: any[] = [];
+  const params: unknown[] = [];
   let whereClause = '';
 
   if (enforcedCampaignId) {
-    whereClause = 'WHERE campaign_id = $1';
+    whereClause = 'WHERE t.campaign_id = $1';
     params.push(enforcedCampaignId);
   }
 
+  // Joins each target against a live aggregate of the SAME underlying
+  // computation used in weekly_campaign_kpis.sql (summed across all
+  // available weeks, not just the currently selected date range), so the
+  // "actual" column here is never a fabricated/decorative number.
   const query = `
-    SELECT campaign_id, metric_name, target_value::FLOAT, unit
-    FROM public_marts.campaign_targets
+    WITH actuals AS (
+      SELECT
+        campaign_id,
+        ROUND((SUM(calls_answered_under_1min_count)::NUMERIC / NULLIF(SUM(total_calls_evaluated), 0)) * 100.0, 2) AS calls_answered_under_1min_pct,
+        ROUND((SUM(csat_satisfied_count)::NUMERIC / NULLIF(SUM(csat_total_responses), 0)) * 100.0, 2) AS csat_score_pct,
+        ROUND(AVG(avg_email_first_reply_mins)::NUMERIC, 2) AS email_first_reply_mins,
+        ROUND(AVG(avg_email_resolution_mins)::NUMERIC, 2) AS email_resolution_mins
+      FROM public_marts.weekly_campaign_kpis
+      GROUP BY campaign_id
+    )
+    SELECT
+      t.campaign_id,
+      t.metric_name,
+      t.target_value::FLOAT,
+      t.unit,
+      (CASE t.metric_name
+        WHEN 'calls_answered_under_1min_pct' THEN a.calls_answered_under_1min_pct
+        WHEN 'csat_score_pct' THEN a.csat_score_pct
+        WHEN 'email_first_reply_mins' THEN a.email_first_reply_mins
+        WHEN 'email_resolution_mins' THEN a.email_resolution_mins
+      END)::FLOAT AS actual_value
+    FROM public_marts.campaign_targets t
+    LEFT JOIN actuals a ON a.campaign_id = t.campaign_id
     ${whereClause}
-    ORDER BY campaign_id ASC, metric_name ASC
+    ORDER BY t.campaign_id ASC, t.metric_name ASC
   `;
 
   const result = await pool.query(query, params);
-  return result.rows;
+
+  return result.rows.map((row) => {
+    const actual = row.actual_value === null || row.actual_value === undefined ? null : Number(row.actual_value);
+    let is_met: boolean | null = null;
+    if (actual !== null) {
+      is_met = HIGHER_IS_BETTER.has(row.metric_name)
+        ? actual >= row.target_value
+        : actual <= row.target_value;
+    }
+    return {
+      campaign_id: row.campaign_id,
+      metric_name: row.metric_name,
+      target_value: row.target_value,
+      unit: row.unit,
+      actual_value: actual,
+      is_met,
+    };
+  });
 }

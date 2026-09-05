@@ -46,9 +46,10 @@ export interface KPIOverviewStats {
   avg_email_resolution_mins: number;
 }
 
+// One row per ISO week, aggregated across whatever campaign scope the
+// session/query resolved to (a single campaign, or summed across all
+// campaigns visible to a management session).
 export interface WeeklyKpiTrend {
-  campaign_id: string;
-  campaign_name: string;
   year: number;
   week: number;
   week_name: string;
@@ -60,11 +61,8 @@ export interface WeeklyKpiTrend {
   chat_volume: number;
   actual_phone_sla_pct: number | null;
   target_phone_sla_pct: number | null;
-  is_phone_sla_met: number | null;
   actual_csat_pct: number | null;
   target_csat_pct: number | null;
-  avg_email_first_reply_mins: number;
-  avg_email_resolution_mins: number;
 }
 
 export interface InteractionRecord {
@@ -86,10 +84,25 @@ export interface InteractionRecord {
   is_call_answered_under_1min: number | null;
 }
 
+export type InteractionSort = 'opened_desc' | 'opened_asc' | 'delay_asc' | 'delay_desc' | 'csat_desc' | 'csat_asc';
+
+export interface PaginatedInteractions {
+  rows: InteractionRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface CampaignTarget {
   campaign_id: string;
   metric_name: string;
   target_value: number;
   unit: string;
+  // Live actual value for this metric, aggregated across all available
+  // weeks for the campaign (same computation as weekly_campaign_kpis).
+  // Null when there's no data yet to evaluate against (e.g. no phone calls
+  // evaluated) — deliberately distinct from "met"/"missed".
+  actual_value: number | null;
+  // Null (not false) when actual_value is null — "no data" is not "missed".
+  is_met: boolean | null;
 }
-
