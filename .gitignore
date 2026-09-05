@@ -11,6 +11,7 @@ dbt_bpo/target/
 dbt_bpo/dbt_packages/
 dbt_bpo/logs/
 dbt_bpo/.user.yml
+dbt_bpo/package-lock.json
 
 # Environment & local secrets
 .env
