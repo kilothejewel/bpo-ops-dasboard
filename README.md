@@ -204,7 +204,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [ ] Column visibility toggle ([#7](https://github.com/kilothejewel/bpo-ops-dasboard/issues/7))
 
 **Code quality**
-- [ ] Split `page.tsx` into components ([#8](https://github.com/kilothejewel/bpo-ops-dasboard/issues/8))
+- [x] Split `page.tsx` into components ([#8](https://github.com/kilothejewel/bpo-ops-dasboard/issues/8))
 - [x] Unit tests for RBAC, session signing and API validation ([#9](https://github.com/kilothejewel/bpo-ops-dasboard/issues/9))
 - [x] Clean lint ([#10](https://github.com/kilothejewel/bpo-ops-dasboard/issues/10))
 - [x] Fail fast when `SESSION_SECRET` is missing in production ([#11](https://github.com/kilothejewel/bpo-ops-dasboard/issues/11))
