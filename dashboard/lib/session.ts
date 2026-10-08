@@ -33,8 +33,34 @@ import { MOCK_USERS } from './auth-constants';
  * verified AD claims — never from an unauthenticated request body.
  */
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || 'dev-only-insecure-secret-change-me-before-any-real-deployment';
+const DEV_FALLBACK_SECRET = 'dev-only-insecure-secret-change-me-before-any-real-deployment';
+const MIN_SECRET_LENGTH = 32;
+
+export class SessionConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SessionConfigError';
+  }
+}
+
+/**
+ * Resolved per call (not at module load) so `next build`, which runs with
+ * NODE_ENV=production, can still import this module without a secret.
+ * In production a missing or short secret is a hard error: the dev
+ * fallback is public, so signing with it would let anyone forge a session.
+ */
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (process.env.NODE_ENV === 'production') {
+    if (!secret || secret.length < MIN_SECRET_LENGTH) {
+      throw new SessionConfigError(
+        `SESSION_SECRET must be set to at least ${MIN_SECRET_LENGTH} characters in production`
+      );
+    }
+    return secret;
+  }
+  return secret || DEV_FALLBACK_SECRET;
+}
 const SESSION_COOKIE_NAME = 'bpo_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 8; // 8 hours
 
@@ -44,7 +70,7 @@ interface SessionPayload {
 }
 
 function sign(payload: string): string {
-  return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  return crypto.createHmac('sha256', getSessionSecret()).update(payload).digest('base64url');
 }
 
 /**

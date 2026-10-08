@@ -130,10 +130,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
-  const [nowTick, setNowTick] = useState<number>(0);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
 
   useEffect(() => {
-    setNowTick(Date.now());
     const id = setInterval(() => setNowTick(Date.now()), 15000);
     return () => clearInterval(id);
   }, []);

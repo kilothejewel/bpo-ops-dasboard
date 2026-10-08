@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, verifySessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/session';
+import {
+  createSessionToken,
+  verifySessionToken,
+  SessionConfigError,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+} from '@/lib/session';
 import { getAvailableMockUsers } from '@/lib/auth-constants';
 
 /**
@@ -23,7 +29,17 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const userId = typeof body?.userId === 'string' ? body.userId : '';
 
-  const token = createSessionToken(userId);
+  let token: string | null;
+  try {
+    token = createSessionToken(userId);
+  } catch (error) {
+    if (error instanceof SessionConfigError) {
+      // Misconfigured deployment: log the reason, never echo it to clients.
+      console.error(error.message);
+      return NextResponse.json({ error: 'Session service unavailable' }, { status: 500 });
+    }
+    throw error;
+  }
   if (!token) {
     return NextResponse.json({ error: 'Unknown persona' }, { status: 400 });
   }

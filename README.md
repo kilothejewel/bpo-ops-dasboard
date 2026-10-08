@@ -205,9 +205,9 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 
 **Code quality**
 - [ ] Split `page.tsx` into components ([#8](https://github.com/kilothejewel/bpo-ops-dasboard/issues/8))
-- [ ] Unit tests for RBAC, session signing and API validation ([#9](https://github.com/kilothejewel/bpo-ops-dasboard/issues/9))
-- [ ] Clean lint ([#10](https://github.com/kilothejewel/bpo-ops-dasboard/issues/10))
-- [ ] Fail fast when `SESSION_SECRET` is missing in production ([#11](https://github.com/kilothejewel/bpo-ops-dasboard/issues/11))
+- [x] Unit tests for RBAC, session signing and API validation ([#9](https://github.com/kilothejewel/bpo-ops-dasboard/issues/9))
+- [x] Clean lint ([#10](https://github.com/kilothejewel/bpo-ops-dasboard/issues/10))
+- [x] Fail fast when `SESSION_SECRET` is missing in production ([#11](https://github.com/kilothejewel/bpo-ops-dasboard/issues/11))
 
 **Features**
 - [ ] Docker Compose one-command setup ([#12](https://github.com/kilothejewel/bpo-ops-dasboard/issues/12))
