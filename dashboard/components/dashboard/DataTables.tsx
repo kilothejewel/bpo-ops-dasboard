@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, TableProperties, SlidersHorizontal, Columns3, X } from 'lucide-react';
+import { Search, TableProperties, SlidersHorizontal, X } from 'lucide-react';
 
 import type { CampaignTarget, InteractionSort, PaginatedInteractions } from '@/lib/types';
 import { shortWeek } from '@/lib/format';
 import InteractionsTable from './InteractionsTable';
 import TargetsTable from './TargetsTable';
+import ColumnMenu from './ColumnMenu';
+import { INTERACTION_COLUMNS } from './interaction-columns';
+import { useHiddenColumns } from '@/hooks/useHiddenColumns';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -46,6 +49,9 @@ export default function DataTables({
   handleClearWeek,
 }: DataTablesProps) {
   const [activeTable, setActiveTable] = useState<'interactions' | 'targets'>('interactions');
+  const { hidden, toggle } = useHiddenColumns();
+  const visibleColumns = INTERACTION_COLUMNS.filter((c) => c.required || !hidden.includes(c.id));
+
   // Local draft so typing stays responsive; the server query fires once
   // the user pauses. Re-syncs if the filter changes from outside (e.g. URL).
   const [searchDraft, setSearchDraft] = useState(search);
@@ -133,13 +139,7 @@ export default function DataTables({
                 ))}
               </select>
             </div>
-            <button
-              className="h-8 px-2.5 rounded-lg border border-slate-800 bg-surface-0 text-slate-400 text-xs font-mono flex items-center gap-1.5"
-              title="Column visibility (coming soon)"
-            >
-              <Columns3 className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Columns</span>
-            </button>
+            <ColumnMenu columns={INTERACTION_COLUMNS} hidden={hidden} onToggle={toggle} />
           </div>
         )}
       </div>
@@ -147,6 +147,7 @@ export default function DataTables({
       {activeTable === 'interactions' ? (
         <InteractionsTable
           interactions={interactions}
+          columns={visibleColumns}
           page={page}
           loading={loading}
           handlePageChange={handlePageChange}

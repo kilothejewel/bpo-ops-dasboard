@@ -202,7 +202,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [x] Real dbt test status and versions instead of hardcoded text ([#4](https://github.com/kilothejewel/bpo-ops-dasboard/issues/4))
 - [x] Working date-range filter ([#5](https://github.com/kilothejewel/bpo-ops-dasboard/issues/5))
 - [x] Server-side search across all interactions ([#6](https://github.com/kilothejewel/bpo-ops-dasboard/issues/6))
-- [ ] Column visibility toggle ([#7](https://github.com/kilothejewel/bpo-ops-dasboard/issues/7))
+- [x] Column visibility toggle ([#7](https://github.com/kilothejewel/bpo-ops-dasboard/issues/7))
 
 **Code quality**
 - [x] Split `page.tsx` into components ([#8](https://github.com/kilothejewel/bpo-ops-dasboard/issues/8))
