@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toSearchParams, useDashboardData } from '@/hooks/useDashboardData';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { shortWeek } from '@/lib/format';
 import Header from '@/components/dashboard/Header';
 import FilterStrip from '@/components/dashboard/FilterStrip';
@@ -11,9 +12,14 @@ import InsightsPanel from '@/components/dashboard/InsightsPanel';
 import DataTables from '@/components/dashboard/DataTables';
 import Footer from '@/components/dashboard/Footer';
 
+const AUTO_REFRESH_SECONDS = 60;
+
 export default function Dashboard() {
   const d = useDashboardData();
   const { filters, weeklyTrends, campaigns, currentPersona, role, lastFetchedAt } = d;
+
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  useAutoRefresh(autoRefresh, d.refresh, lastFetchedAt, AUTO_REFRESH_SECONDS * 1000);
 
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   useEffect(() => {
@@ -54,6 +60,9 @@ export default function Dashboard() {
         personas={d.personas}
         currentUserId={d.currentUserId}
         currentPersona={currentPersona}
+        autoRefresh={autoRefresh}
+        autoRefreshSeconds={AUTO_REFRESH_SECONDS}
+        onToggleAutoRefresh={() => setAutoRefresh((v) => !v)}
         exportHref={`/api/export?${toSearchParams(filters).toString()}`}
         handleRefresh={d.refresh}
         handlePersonaSelect={d.switchPersona}

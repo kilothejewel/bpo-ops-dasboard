@@ -216,5 +216,5 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [ ] Agent leaderboard ([#14](https://github.com/kilothejewel/bpo-ops-dasboard/issues/14))
 - [ ] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))
 - [x] Week-over-week change on KPI cards ([#16](https://github.com/kilothejewel/bpo-ops-dasboard/issues/16))
-- [ ] Auto-refresh toggle ([#17](https://github.com/kilothejewel/bpo-ops-dasboard/issues/17))
+- [x] Auto-refresh toggle ([#17](https://github.com/kilothejewel/bpo-ops-dasboard/issues/17))
 - [ ] CI: lint, typecheck, tests, build and dbt build ([#18](https://github.com/kilothejewel/bpo-ops-dasboard/issues/18))

@@ -16,6 +16,9 @@ interface HeaderProps {
   currentUserId: string;
   currentPersona: MockUserProfile | undefined;
   exportHref: string;
+  autoRefresh: boolean;
+  autoRefreshSeconds: number;
+  onToggleAutoRefresh: () => void;
   handleRefresh: () => void;
   handlePersonaSelect: (userId: string) => void;
 }
@@ -29,6 +32,9 @@ export default function Header({
   currentUserId,
   currentPersona,
   exportHref,
+  autoRefresh,
+  autoRefreshSeconds,
+  onToggleAutoRefresh,
   handleRefresh,
   handlePersonaSelect,
 }: HeaderProps) {
@@ -81,15 +87,27 @@ export default function Header({
             </span>
           </div>
           <div className="h-4 w-px bg-slate-800 hidden md:block" />
-          <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-slate-400">
+          <button
+            onClick={onToggleAutoRefresh}
+            aria-pressed={autoRefresh}
+            title={
+              autoRefresh
+                ? `Auto-refresh on: every ${autoRefreshSeconds}s while this tab is visible. Click to turn off.`
+                : 'Auto-refresh off. Click to refresh automatically.'
+            }
+            className="hidden md:flex items-center gap-2 text-[11px] font-mono text-slate-400 hover:text-slate-200 rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-slate-800/50 transition"
+          >
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/40 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              {autoRefresh && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/40 opacity-75" />
+              )}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${autoRefresh ? 'bg-emerald-500' : 'bg-slate-500'}`} />
             </span>
             <span>
-              {loading ? 'Syncing' : 'Sync idle'} · <span className="text-slate-300">{syncAgoLabel}</span>
+              {loading ? 'Syncing' : autoRefresh ? `Live · ${autoRefreshSeconds}s` : 'Auto-refresh off'} ·{' '}
+              <span className="text-slate-300">{syncAgoLabel}</span>
             </span>
-          </div>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
