@@ -12,6 +12,7 @@ import {
   InteractionSort,
   PaginatedInteractions,
   DateRange,
+  DashboardMeta,
 } from '@/lib/types';
 import { parseDashboardQuery } from '@/lib/query-params';
 
@@ -100,6 +101,7 @@ export function useDashboardData() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
+  const [meta, setMeta] = useState<DashboardMeta | null>(null);
 
   // Drops responses from superseded requests (e.g. fast filter changes) so
   // an older, slower response can never overwrite a newer one.
@@ -131,6 +133,17 @@ export function useDashboardData() {
     }
   }, []);
 
+  // Pipeline status changes only when dbt re-runs, so it's fetched with the
+  // session and on manual refresh rather than on every filter change.
+  const fetchMeta = useCallback(async () => {
+    try {
+      const res = await fetch('/api/meta', { credentials: 'same-origin' });
+      if (res.ok) setMeta(await res.json());
+    } catch (err) {
+      console.error('Failed to load pipeline status', err);
+    }
+  }, []);
+
   const establishSession = useCallback(
     async (userId: string, f: DashboardFilters, keepPage = false) => {
       setLoading(true);
@@ -152,6 +165,7 @@ export function useDashboardData() {
         filtersRef.current = next;
         setFilters(next);
         syncLocation(next);
+        fetchMeta();
         await fetchData(next);
       } catch (err: unknown) {
         console.error(err);
@@ -159,7 +173,7 @@ export function useDashboardData() {
         setLoading(false);
       }
     },
-    [fetchData]
+    [fetchData, fetchMeta]
   );
 
   const hasBootstrapped = useRef(false);
@@ -210,7 +224,10 @@ export function useDashboardData() {
     [personas, establishSession]
   );
 
-  const refresh = useCallback(() => fetchData(filtersRef.current), [fetchData]);
+  const refresh = useCallback(() => {
+    fetchMeta();
+    return fetchData(filtersRef.current);
+  }, [fetchData, fetchMeta]);
 
   return {
     personas,
@@ -229,6 +246,7 @@ export function useDashboardData() {
     loading,
     error,
     lastFetchedAt,
+    meta,
   };
 }
 

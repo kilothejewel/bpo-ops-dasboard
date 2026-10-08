@@ -110,3 +110,8 @@ export interface CampaignTarget {
   // Null (not false) when actual_value is null — "no data" is not "missed".
   is_met: boolean | null;
 }
+
+export interface DashboardMeta {
+  nextVersion: string;
+  dbt: import('./dbt-status').DbtStatus;
+}

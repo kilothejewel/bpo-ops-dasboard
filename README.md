@@ -102,6 +102,7 @@ All configuration is read from environment variables. Every variable has a **dev
 | `POSTGRES_USER` | generator, dbt, dashboard | `postgres` | Yes | Database user (use a read-only role for the dashboard in prod) |
 | `POSTGRES_PASSWORD` | generator, dbt, dashboard | `postgres` | **Yes — secret** | Database password |
 | `SESSION_SECRET` | dashboard (`lib/session.ts`) | public placeholder string | **Yes — secret** | HMAC key that signs the `bpo_session` cookie. Anyone who knows it can forge a session, so the fallback must never reach a shared environment. Generate with `openssl rand -base64 32`. |
+| `DBT_TARGET_DIR` | dashboard (`lib/dbt-status.ts`) | `../dbt_bpo/target` | Only if relocated | Where to find dbt's `run_results.json` for the live "dbt tests: N/N passing" badge and dbt version. Set it when the dashboard runs outside the repo checkout (e.g. a container with the artifacts mounted). |
 | `NODE_ENV` | dashboard | set by Next.js | Set automatically | `production` enables the cookie `Secure` flag and disables the dev-mode pg pool cache. Don't set it by hand. |
 
 **Where each component reads them from:**
@@ -198,7 +199,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 **Quick wins: replace placeholders with working features**
 - [x] Export button downloads filtered interactions as CSV ([#2](https://github.com/kilothejewel/bpo-ops-dasboard/issues/2))
 - [x] Share button copies a link that restores the current view ([#3](https://github.com/kilothejewel/bpo-ops-dasboard/issues/3))
-- [ ] Real dbt test status and versions instead of hardcoded text ([#4](https://github.com/kilothejewel/bpo-ops-dasboard/issues/4))
+- [x] Real dbt test status and versions instead of hardcoded text ([#4](https://github.com/kilothejewel/bpo-ops-dasboard/issues/4))
 - [x] Working date-range filter ([#5](https://github.com/kilothejewel/bpo-ops-dasboard/issues/5))
 - [x] Server-side search across all interactions ([#6](https://github.com/kilothejewel/bpo-ops-dasboard/issues/6))
 - [ ] Column visibility toggle ([#7](https://github.com/kilothejewel/bpo-ops-dasboard/issues/7))

@@ -2,7 +2,9 @@
 
 import { Database } from 'lucide-react';
 
-import type { CampaignOption, DateRange, KPIOverviewStats, MockUserProfile, UserRole } from '@/lib/types';
+import DbtStatusBadge from './DbtStatusBadge';
+
+import type { CampaignOption, DashboardMeta, DateRange, KPIOverviewStats, MockUserProfile, UserRole } from '@/lib/types';
 
 const RANGE_OPTIONS: { value: DateRange; label: string }[] = [
   { value: 'latest', label: 'Latest wk' },
@@ -16,6 +18,7 @@ interface FilterStripProps {
   campaigns: CampaignOption[];
   currentPersona: MockUserProfile | undefined;
   kpiOverview: KPIOverviewStats | null;
+  meta: DashboardMeta | null;
   selectedCampaignId: string;
   selectedChannel: string;
   selectedRange: DateRange;
@@ -30,6 +33,7 @@ export default function FilterStrip({
   campaigns,
   currentPersona,
   kpiOverview,
+  meta,
   selectedCampaignId,
   selectedChannel,
   selectedRange,
@@ -118,9 +122,7 @@ export default function FilterStrip({
             Rows: <span className="text-slate-200 tabular-nums">{(kpiOverview?.total_interactions ?? 0).toLocaleString()}</span>
           </span>
           <span className="text-slate-700">·</span>
-          <span className="text-emerald-400 font-medium flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> dbt tests: 48/48 passing
-          </span>
+          <DbtStatusBadge meta={meta} />
         </div>
       </div>
     </section>

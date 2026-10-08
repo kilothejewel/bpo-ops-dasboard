@@ -1,4 +1,6 @@
-export default function Footer() {
+import type { DashboardMeta } from '@/lib/types';
+
+export default function Footer({ meta }: { meta: DashboardMeta | null }) {
   return (
     <footer className="border-t border-slate-800/70 bg-surface-0 mt-auto px-4 sm:px-6 py-3 text-xs text-slate-500">
       <div className="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-4">
@@ -24,10 +26,10 @@ export default function Footer() {
             Target: <strong className="text-slate-300 font-normal">local · postgres</strong>
           </span>
           <span>
-            Runtime: <strong className="text-slate-300 font-normal">Next.js 16.3.4</strong>
+            Runtime: <strong className="text-slate-300 font-normal">{meta ? `Next.js ${meta.nextVersion}` : '—'}</strong>
           </span>
           <span>
-            dbt: <strong className="text-slate-300 font-normal">1.12.3</strong>
+            dbt: <strong className="text-slate-300 font-normal">{meta?.dbt.dbtVersion ?? '—'}</strong>
           </span>
         </div>
       </div>

@@ -65,6 +65,7 @@ export default function Dashboard() {
         campaigns={campaigns}
         currentPersona={currentPersona}
         kpiOverview={d.kpiOverview}
+        meta={d.meta}
         selectedCampaignId={filters.campaignId}
         selectedChannel={filters.channel}
         selectedRange={filters.range}
@@ -103,7 +104,7 @@ export default function Dashboard() {
         />
       </main>
 
-      <Footer />
+      <Footer meta={d.meta} />
     </div>
   );
 }
