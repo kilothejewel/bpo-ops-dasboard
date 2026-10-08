@@ -26,6 +26,9 @@ import {
   InteractionSort,
   PaginatedInteractions,
 } from '@/lib/types';
+import TrendChart, { TREND_COLORS } from '@/components/charts/TrendChart';
+import VolumeChart, { VOLUME_SERIES } from '@/components/charts/VolumeChart';
+import Sparkline from '@/components/charts/Sparkline';
 
 const DEFAULT_MANAGEMENT_USER_ID = 'mgmt-exec';
 
@@ -58,55 +61,6 @@ function formatDelay(seconds: number | null): string {
 function formatPct(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined) return '--';
   return value.toFixed(digits);
-}
-
-/** Builds an SVG polyline "x,y x,y ..." string for a fixed viewBox, mapping
- * values onto [minVal, maxVal] -> [top, bottom]. Nulls fall back to 0 for
- * plotting purposes only (display values elsewhere remain the real null). */
-function buildSeriesPoints(
-  values: (number | null)[],
-  opts: { x0: number; x1: number; yTop: number; yBottom: number; minVal: number; maxVal: number }
-): { x: number; y: number }[] {
-  const { x0, x1, yTop, yBottom, minVal, maxVal } = opts;
-  const n = values.length;
-  if (n === 0) return [];
-  const step = n > 1 ? (x1 - x0) / (n - 1) : 0;
-  return values.map((v, i) => {
-    const val = v ?? minVal;
-    const clamped = Math.max(minVal, Math.min(maxVal, val));
-    const ratio = (clamped - minVal) / (maxVal - minVal || 1);
-    const x = x0 + step * i;
-    const y = yBottom - ratio * (yBottom - yTop);
-    return { x, y };
-  });
-}
-
-function pointsToPolyline(pts: { x: number; y: number }[]): string {
-  return pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-}
-
-function pointsToAreaPolygon(pts: { x: number; y: number }[], yBottom: number): string {
-  if (pts.length === 0) return '';
-  const line = pointsToPolyline(pts);
-  return `${line} ${pts[pts.length - 1].x.toFixed(1)},${yBottom.toFixed(1)} ${pts[0].x.toFixed(1)},${yBottom.toFixed(1)}`;
-}
-
-function buildSparklinePath(values: number[]): string {
-  const w = 70;
-  const h = 28;
-  const pad = 3;
-  const n = values.length;
-  if (n === 0) return `M2 ${h - pad} L${w - 2} ${h - pad}`;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const step = n > 1 ? (w - 4) / (n - 1) : 0;
-  const pts = values.map((v, i) => {
-    const x = 2 + step * i;
-    const y = h - pad - ((v - min) / range) * (h - pad * 2);
-    return `${x.toFixed(1)} ${y.toFixed(1)}`;
-  });
-  return `M${pts.join(' L')}`;
 }
 
 /** Compact pagination model: 1, 2, 3 ... current-1 current current+1 ... last */
@@ -331,18 +285,9 @@ export default function Dashboard() {
     );
   }, [interactions.rows, searchQuery]);
 
-  const slaSparkline = useMemo(
-    () => buildSparklinePath(weeklyTrends.map((w) => w.actual_phone_sla_pct ?? 0)),
-    [weeklyTrends]
-  );
-  const csatSparkline = useMemo(
-    () => buildSparklinePath(weeklyTrends.map((w) => w.actual_csat_pct ?? 0)),
-    [weeklyTrends]
-  );
-  const volumeSparkline = useMemo(
-    () => buildSparklinePath(weeklyTrends.map((w) => w.total_interactions)),
-    [weeklyTrends]
-  );
+  const slaSeries = useMemo(() => weeklyTrends.map((w) => w.actual_phone_sla_pct), [weeklyTrends]);
+  const csatSeries = useMemo(() => weeklyTrends.map((w) => w.actual_csat_pct), [weeklyTrends]);
+  const volumeSeries = useMemo(() => weeklyTrends.map((w) => w.total_interactions), [weeklyTrends]);
 
   const phoneDelta =
     kpiOverview && kpiOverview.target_phone_sla_pct !== null
@@ -369,31 +314,14 @@ export default function Dashboard() {
     return `${Math.round(secs / 60)}m ago`;
   }, [lastFetchedAt, nowTick]);
 
-  // ---- Trend chart geometry (SVG, viewBox 0 0 900 240) --------------------
-  const CHART = { x0: 65, x1: 865, yTop: 20, yBottom: 215 };
-  const trendWeeks = weeklyTrends.map((w) => shortWeek(w.week_name));
-  const slaValues = weeklyTrends.map((w) => w.actual_phone_sla_pct);
-  const csatValues = weeklyTrends.map((w) => w.actual_csat_pct);
-  const avgSla = slaValues.length ? slaValues.reduce((s: number, v) => s + (v ?? 0), 0) / slaValues.length : null;
-  const avgCsat = csatValues.length ? csatValues.reduce((s: number, v) => s + (v ?? 0), 0) / csatValues.length : null;
-  const slaSeriesWithAvg = [...slaValues, avgSla];
-  const csatSeriesWithAvg = [...csatValues, avgCsat];
-  const labelsWithAvg = [...trendWeeks, 'Avg'];
-
-  const slaPts = buildSeriesPoints(slaSeriesWithAvg, { ...CHART, minVal: 0, maxVal: 100 });
-  const csatPts = buildSeriesPoints(csatSeriesWithAvg, { ...CHART, minVal: 0, maxVal: 100 });
-  const slaTargetY = kpiOverview?.target_phone_sla_pct
-    ? CHART.yBottom - (kpiOverview.target_phone_sla_pct / 100) * (CHART.yBottom - CHART.yTop)
-    : null;
-  const csatTargetY = kpiOverview?.target_csat_pct
-    ? CHART.yBottom - (kpiOverview.target_csat_pct / 100) * (CHART.yBottom - CHART.yTop)
-    : null;
-
-  // ---- Distribution chart geometry ----------------------------------------
-  const DIST = { x0: 55, x1: 855, yTop: 20, yBottom: 215, barW: 26 };
-  const weekTotals = weeklyTrends.map((w) => w.call_volume + w.email_volume + w.ticket_volume + w.chat_volume);
-  const maxWeekTotal = Math.max(1, ...weekTotals);
-  const distStep = weeklyTrends.length > 1 ? (DIST.x1 - DIST.x0) / weeklyTrends.length : 0;
+  // Period averages over weeks that actually have a value (null weeks are
+  // excluded rather than counted as 0).
+  const mean = (vals: (number | null)[]) => {
+    const present = vals.filter((v): v is number => v !== null);
+    return present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
+  };
+  const avgSla = mean(slaSeries);
+  const avgCsat = mean(csatSeries);
 
   const breadcrumbLabel =
     role === 'management'
@@ -630,9 +558,7 @@ export default function Dashboard() {
                   {formatPct(kpiOverview?.overall_phone_sla_pct)}
                   <span className="text-lg text-slate-500 font-sans font-normal">%</span>
                 </div>
-                <svg className="w-16 h-7" fill="none" viewBox="0 0 70 28">
-                  <path d={slaSparkline} stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
-                </svg>
+                <Sparkline values={slaSeries} color={TREND_COLORS.sla} />
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
@@ -666,9 +592,7 @@ export default function Dashboard() {
                   {formatPct(kpiOverview?.overall_csat_pct)}
                   <span className="text-lg text-slate-500 font-sans font-normal">%</span>
                 </div>
-                <svg className="w-16 h-7" fill="none" viewBox="0 0 70 28">
-                  <path d={csatSparkline} stroke="#94a3b8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
-                </svg>
+                <Sparkline values={csatSeries} color={TREND_COLORS.csat} />
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
@@ -733,9 +657,7 @@ export default function Dashboard() {
                 <div className="text-3xl font-semibold font-mono tracking-tight text-white tabular-nums">
                   {(kpiOverview?.total_interactions ?? 0).toLocaleString()}
                 </div>
-                <svg className="w-16 h-7" fill="none" viewBox="0 0 70 28">
-                  <path d={volumeSparkline} stroke="#0ea5e9" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
-                </svg>
+                <Sparkline values={volumeSeries} color="#94a3b8" />
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
@@ -788,80 +710,41 @@ export default function Dashboard() {
               <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 mb-2 font-mono gap-2">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-0.5 bg-sky-400 inline-block rounded-full" />
+                    <span className="w-2.5 h-0.5 inline-block rounded-full" style={{ backgroundColor: TREND_COLORS.sla }} />
                     <span className="text-slate-200 font-medium">Phone SLA %</span>
+                    <span className="text-slate-500">avg {formatPct(avgSla, 1)}%</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-0.5 bg-slate-300 inline-block rounded-full" />
-                    <span className="text-slate-300">CSAT Score %</span>
+                    <span className="w-2.5 h-0.5 inline-block rounded-full" style={{ backgroundColor: TREND_COLORS.csat }} />
+                    <span className="text-slate-200 font-medium">CSAT Score %</span>
+                    <span className="text-slate-500">avg {formatPct(avgCsat, 1)}%</span>
                   </div>
-                  {slaTargetY !== null && (
+                  {kpiOverview?.target_phone_sla_pct != null && (
                     <div className="flex items-center gap-1.5 text-slate-500">
-                      <span className="w-3 border-b border-dashed border-sky-500/50 inline-block" />
-                      <span>SLA Target: {kpiOverview?.target_phone_sla_pct?.toFixed(0)}%</span>
+                      <span className="w-3 border-b border-dashed inline-block" style={{ borderColor: TREND_COLORS.sla }} />
+                      <span>SLA Target: {kpiOverview.target_phone_sla_pct.toFixed(0)}%</span>
                     </div>
                   )}
-                  {csatTargetY !== null && (
+                  {kpiOverview?.target_csat_pct != null && (
                     <div className="flex items-center gap-1.5 text-slate-500">
-                      <span className="w-3 border-b border-dashed border-slate-600 inline-block" />
-                      <span>CSAT Baseline: {kpiOverview?.target_csat_pct?.toFixed(0)}%</span>
+                      <span className="w-3 border-b border-dashed inline-block" style={{ borderColor: TREND_COLORS.csat }} />
+                      <span>CSAT Baseline: {kpiOverview.target_csat_pct.toFixed(0)}%</span>
                     </div>
                   )}
                 </div>
-                <span className="text-slate-500">{weekRangeLabel} Normalized</span>
+                <span className="text-slate-500">{weekRangeLabel} · hover for weekly values</span>
               </div>
 
               <div className="relative w-full h-[260px]">
                 {weeklyTrends.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-slate-500 text-xs">No trend data available</div>
                 ) : (
-                  <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 900 240">
-                    <defs>
-                      <linearGradient id="slaGradient" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.22" />
-                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    {[0, 25, 50, 75, 100].map((pct) => {
-                      const y = CHART.yBottom - (pct / 100) * (CHART.yBottom - CHART.yTop);
-                      return (
-                        <g key={pct}>
-                          <line x1={CHART.x0 - 20} x2={CHART.x1} y1={y} y2={y} stroke="#1e293b" strokeDasharray={pct === 0 ? undefined : '2 4'} />
-                          <text x={CHART.x0 - 30} y={y + 4} textAnchor="end" className="font-mono" fontSize="10" fill="#64748b">
-                            {pct}%
-                          </text>
-                        </g>
-                      );
-                    })}
-                    {slaTargetY !== null && (
-                      <line x1={CHART.x0 - 20} x2={CHART.x1} y1={slaTargetY} y2={slaTargetY} stroke="#38bdf8" strokeDasharray="3 4" strokeOpacity="0.4" />
-                    )}
-                    {csatTargetY !== null && (
-                      <line x1={CHART.x0 - 20} x2={CHART.x1} y1={csatTargetY} y2={csatTargetY} stroke="#64748b" strokeDasharray="3 4" strokeOpacity="0.5" />
-                    )}
-                    <polygon fill="url(#slaGradient)" points={pointsToAreaPolygon(slaPts, CHART.yBottom)} />
-                    <polyline fill="none" points={pointsToPolyline(slaPts)} stroke="#0ea5e9" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-                    <polyline fill="none" points={pointsToPolyline(csatPts)} stroke="#94a3b8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                    {slaPts.map((p, i) => (
-                      <circle key={`s${i}`} cx={p.x} cy={p.y} r="3" fill="#070f1e" stroke="#0ea5e9" strokeWidth="2" />
-                    ))}
-                    {csatPts.map((p, i) => (
-                      <circle key={`c${i}`} cx={p.x} cy={p.y} r="3" fill="#070f1e" stroke="#94a3b8" strokeWidth="2" />
-                    ))}
-                    {labelsWithAvg.map((label, i) => (
-                      <text
-                        key={label + i}
-                        x={slaPts[i]?.x ?? 0}
-                        y={CHART.yBottom + 17}
-                        textAnchor="middle"
-                        className="font-mono"
-                        fontSize="10"
-                        fill="#64748b"
-                      >
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                  <TrendChart
+                    data={weeklyTrends}
+                    slaTarget={kpiOverview?.target_phone_sla_pct ?? null}
+                    csatTarget={kpiOverview?.target_csat_pct ?? null}
+                    formatWeek={shortWeek}
+                  />
                 )}
               </div>
             </div>
@@ -869,22 +752,12 @@ export default function Dashboard() {
             <div className="pt-4">
               <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 mb-2 font-mono gap-2">
                 <div className="flex flex-wrap items-center gap-5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-[#0369a1] inline-block" />
-                    <span className="text-slate-300">Phone Calls</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-[#0ea5e9] inline-block" />
-                    <span className="text-slate-300">Emails</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-[#38bdf8] inline-block" />
-                    <span className="text-slate-300">Tickets</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-[#64748b] inline-block" />
-                    <span className="text-slate-300">Chat</span>
-                  </div>
+                  {VOLUME_SERIES.map((ser) => (
+                    <div key={ser.key} className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: ser.color }} />
+                      <span className="text-slate-300">{ser.name}</span>
+                    </div>
+                  ))}
                 </div>
                 <span className="text-slate-500">Volume per ISO-Week</span>
               </div>
@@ -893,43 +766,7 @@ export default function Dashboard() {
                 {weeklyTrends.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-slate-500 text-xs">No volume data available</div>
                 ) : (
-                  <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 900 240">
-                    {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-                      const y = DIST.yBottom - f * (DIST.yBottom - DIST.yTop);
-                      return (
-                        <g key={f}>
-                          <line x1={DIST.x0 - 20} x2={DIST.x1} y1={y} y2={y} stroke="#1e293b" strokeDasharray={f === 0 ? undefined : '2 4'} />
-                          <text x={DIST.x0 - 30} y={y + 4} textAnchor="end" className="font-mono" fontSize="10" fill="#64748b">
-                            {Math.round(maxWeekTotal * f)}
-                          </text>
-                        </g>
-                      );
-                    })}
-                    {weeklyTrends.map((w, i) => {
-                      const xCenter = DIST.x0 + distStep * i + distStep / 2;
-                      const x = xCenter - DIST.barW / 2;
-                      const scale = (DIST.yBottom - DIST.yTop) / maxWeekTotal;
-                      let yCursor = DIST.yBottom;
-                      const segments = [
-                        { val: w.call_volume, fill: '#0369a1' },
-                        { val: w.email_volume, fill: '#0ea5e9' },
-                        { val: w.ticket_volume, fill: '#38bdf8' },
-                        { val: w.chat_volume, fill: '#64748b' },
-                      ];
-                      return (
-                        <g key={w.week_name} className="transition-opacity hover:opacity-85">
-                          {segments.map((seg, si) => {
-                            const h = seg.val * scale;
-                            yCursor -= h;
-                            return <rect key={si} x={x} y={yCursor} width={DIST.barW} height={h} fill={seg.fill} rx={si === segments.length - 1 ? 2 : 0} />;
-                          })}
-                          <text x={xCenter} y={DIST.yBottom + 17} textAnchor="middle" className="font-mono" fontSize="10" fill="#64748b">
-                            {shortWeek(w.week_name)}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
+                  <VolumeChart data={weeklyTrends} formatWeek={shortWeek} />
                 )}
               </div>
             </div>
