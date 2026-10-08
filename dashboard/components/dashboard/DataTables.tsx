@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, TableProperties, SlidersHorizontal, X } from 'lucide-react';
+import { Search, TableProperties, SlidersHorizontal, Trophy, X } from 'lucide-react';
 
-import type { CampaignTarget, InteractionSort, PaginatedInteractions } from '@/lib/types';
+import type { AgentLeaderboardRow, CampaignTarget, InteractionSort, PaginatedInteractions } from '@/lib/types';
 import { shortWeek } from '@/lib/format';
 import InteractionsTable from './InteractionsTable';
 import TargetsTable from './TargetsTable';
+import AgentLeaderboard from './AgentLeaderboard';
 import ColumnMenu from './ColumnMenu';
 import { INTERACTION_COLUMNS } from './interaction-columns';
 import { useHiddenColumns } from '@/hooks/useHiddenColumns';
@@ -24,6 +25,9 @@ const SORT_OPTIONS: { value: InteractionSort; label: string }[] = [
 interface DataTablesProps {
   interactions: PaginatedInteractions;
   targets: CampaignTarget[];
+  agents: AgentLeaderboardRow[];
+  slaTarget: number | null;
+  csatTarget: number | null;
   page: number;
   sort: InteractionSort;
   loading: boolean;
@@ -38,6 +42,9 @@ interface DataTablesProps {
 export default function DataTables({
   interactions,
   targets,
+  agents,
+  slaTarget,
+  csatTarget,
   page,
   sort,
   loading,
@@ -48,7 +55,7 @@ export default function DataTables({
   handleSearchChange,
   handleClearWeek,
 }: DataTablesProps) {
-  const [activeTable, setActiveTable] = useState<'interactions' | 'targets'>('interactions');
+  const [activeTable, setActiveTable] = useState<'interactions' | 'agents' | 'targets'>('interactions');
   const { hidden, toggle } = useHiddenColumns();
   const visibleColumns = INTERACTION_COLUMNS.filter((c) => c.required || !hidden.includes(c.id));
 
@@ -70,7 +77,7 @@ export default function DataTables({
   return (
     <section className="panel rounded-xl overflow-hidden">
       <div className="p-3.5 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-surface-0/60">
-        <div className="flex items-center gap-1.5 p-1 bg-surface-0 border border-slate-800 rounded-lg">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-surface-0 border border-slate-800 rounded-lg">
           <button
             onClick={() => setActiveTable('interactions')}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2 transition ${
@@ -83,6 +90,20 @@ export default function DataTables({
             fct_interactions
             <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-0 border border-sky-700/60 text-sky-300">
               {interactions.total.toLocaleString()}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTable('agents')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition ${
+              activeTable === 'agents'
+                ? 'bg-surface-1 border border-sky-500/70 text-sky-400'
+                : 'border border-transparent text-slate-400 hover:text-sky-300'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            agent_leaderboard
+            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-0 text-slate-400 border border-slate-800">
+              {agents.length}
             </span>
           </button>
           <button
@@ -152,6 +173,8 @@ export default function DataTables({
           loading={loading}
           handlePageChange={handlePageChange}
         />
+      ) : activeTable === 'agents' ? (
+        <AgentLeaderboard agents={agents} slaTarget={slaTarget} csatTarget={csatTarget} />
       ) : (
         <TargetsTable targets={targets} />
       )}

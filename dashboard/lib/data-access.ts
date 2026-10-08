@@ -11,6 +11,7 @@ import {
   DateRange,
   WeekOverWeek,
   WeekSnapshot,
+  AgentLeaderboardRow,
 } from './types';
 
 export class MissingCampaignAccessError extends Error {
@@ -356,6 +357,37 @@ export async function getGranularInteractions(
   const rows: InteractionRecord[] = result.rows.map(({ total_count: _total_count, ...rest }) => rest);
 
   return { rows, total, page: safePage, pageSize };
+}
+
+/**
+ * Per-agent performance over the same filtered interaction set as the
+ * table (campaign via RBAC, range, channel, week). Free-text search is
+ * deliberately not applied: it narrows rows, not the population of agents.
+ * Percentages use the same definitions as weekly_campaign_kpis.
+ */
+export async function getAgentLeaderboard(
+  session: UserSession,
+  opts: Omit<InteractionFilterOptions, 'search'> = {}
+): Promise<AgentLeaderboardRow[]> {
+  const filter = buildInteractionFilter(session, { ...opts, search: undefined });
+  const query = `
+    SELECT
+      a.agent_id,
+      a.agent_name,
+      a.role,
+      COUNT(*)::INT AS interactions,
+      COUNT(f.is_call_answered_under_1min)::INT AS calls_evaluated,
+      ROUND((SUM(f.is_call_answered_under_1min)::NUMERIC / NULLIF(COUNT(f.is_call_answered_under_1min), 0)) * 100.0, 2)::FLOAT AS phone_sla_pct,
+      ROUND(AVG(CASE WHEN f.channel = 'phone' THEN f.answer_time_seconds END)::NUMERIC, 0)::INT AS avg_answer_seconds,
+      COUNT(f.is_csat_satisfied)::INT AS csat_responses,
+      ROUND((SUM(f.is_csat_satisfied)::NUMERIC / NULLIF(COUNT(f.is_csat_satisfied), 0)) * 100.0, 2)::FLOAT AS csat_pct
+    ${INTERACTION_FROM}
+    ${filter.where()}
+    GROUP BY a.agent_id, a.agent_name, a.role
+    ORDER BY interactions DESC, a.agent_name
+  `;
+  const result = await pool.query(query, filter.params);
+  return result.rows;
 }
 
 /** Hard cap so an export can't turn into an unbounded table dump. */

@@ -83,6 +83,18 @@ export interface WeekSnapshot {
   days_with_data: number;
 }
 
+export interface AgentLeaderboardRow {
+  agent_id: string;
+  agent_name: string;
+  role: string;
+  interactions: number;
+  calls_evaluated: number;
+  phone_sla_pct: number | null;
+  avg_answer_seconds: number | null;
+  csat_responses: number;
+  csat_pct: number | null;
+}
+
 export interface InteractionRecord {
   interaction_id: string;
   campaign_id: string;

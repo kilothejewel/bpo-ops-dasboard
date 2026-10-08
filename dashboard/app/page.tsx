@@ -106,6 +106,9 @@ export default function Dashboard() {
         <DataTables
           interactions={d.interactions}
           targets={d.targets}
+          agents={d.agents}
+          slaTarget={d.kpiOverview?.target_phone_sla_pct ?? null}
+          csatTarget={d.kpiOverview?.target_csat_pct ?? null}
           page={filters.page}
           sort={filters.sort}
           loading={d.loading}

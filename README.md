@@ -213,7 +213,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 **Features**
 - [ ] Docker Compose one-command setup ([#12](https://github.com/kilothejewel/bpo-ops-dasboard/issues/12))
 - [x] Chart drill-down to a week ([#13](https://github.com/kilothejewel/bpo-ops-dasboard/issues/13))
-- [ ] Agent leaderboard ([#14](https://github.com/kilothejewel/bpo-ops-dasboard/issues/14))
+- [x] Agent leaderboard ([#14](https://github.com/kilothejewel/bpo-ops-dasboard/issues/14))
 - [ ] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))
 - [x] Week-over-week change on KPI cards ([#16](https://github.com/kilothejewel/bpo-ops-dasboard/issues/16))
 - [x] Auto-refresh toggle ([#17](https://github.com/kilothejewel/bpo-ops-dasboard/issues/17))
