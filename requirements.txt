@@ -1,0 +1,6 @@
+# Bronze -> Gold pipeline: scripts/generate_data.py + dbt (dbt_bpo/).
+# Shared by local setup, Dockerfile.pipeline and CI.
+pandas>=2,<3
+faker>=25
+psycopg2-binary>=2.9,<3
+dbt-postgres>=1.8,<2

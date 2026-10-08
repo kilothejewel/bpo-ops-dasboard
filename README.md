@@ -1,5 +1,7 @@
 # BPO Weekly Operations Dashboard
 
+[![CI](https://github.com/kilothejewel/bpo-ops-dasboard/actions/workflows/ci.yml/badge.svg)](https://github.com/kilothejewel/bpo-ops-dasboard/actions/workflows/ci.yml)
+
 A self-hosted, medallion-architecture data platform and operational dashboard built for a Business Process Outsourcing (BPO) environment. This project demonstrates a production-grade data engineering pipeline and executive reporting layer, serving as Stage 2 of a technical interview/architecture exercise (mapping to an enterprise Azure target state).
 
 ---
@@ -156,7 +158,7 @@ psql -U postgres -c "CREATE DATABASE bpo_db;"
 ### 2. Generate Synthetic Dataset & Load Bronze Layer
 Install Python dependencies and execute the dataset generator:
 ```bash
-pip install pandas faker psycopg2-binary
+pip install -r requirements.txt   # pandas, faker, psycopg2-binary, dbt-postgres
 python scripts/generate_data.py
 ```
 *Output*: Generates ~3,600 realistic interaction records across 4 campaigns and loads them into PostgreSQL `raw` schema.
@@ -204,6 +206,20 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser. The dashboard establishes an initial demo session automatically (Operations Director persona) — use the tier switcher to try other personas.
 
+### 6. Running the Checks
+
+The same checks run in CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) on every push and pull request:
+
+```bash
+cd dashboard
+npm run lint        # ESLint
+npm run typecheck   # tsc --noEmit
+npm test            # Vitest: RBAC, session signing, query validation, CSV, alerts, formatting
+npm run build       # production build
+```
+
+CI also runs the full pipeline against a Postgres service (`generate_data.py`, then `dbt build` with all data tests), and boots the Docker Compose stack to smoke-test the API.
+
 ---
 
 ## 🛠️ Definition of Done Verification Checklist
@@ -241,4 +257,4 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [x] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))
 - [x] Week-over-week change on KPI cards ([#16](https://github.com/kilothejewel/bpo-ops-dasboard/issues/16))
 - [x] Auto-refresh toggle ([#17](https://github.com/kilothejewel/bpo-ops-dasboard/issues/17))
-- [ ] CI: lint, typecheck, tests, build and dbt build ([#18](https://github.com/kilothejewel/bpo-ops-dasboard/issues/18))
+- [x] CI: lint, typecheck, tests, build and dbt build ([#18](https://github.com/kilothejewel/bpo-ops-dasboard/issues/18))
