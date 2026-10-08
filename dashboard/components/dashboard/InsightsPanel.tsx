@@ -12,9 +12,17 @@ interface InsightsPanelProps {
   kpiOverview: KPIOverviewStats | null;
   weeklyTrends: WeeklyKpiTrend[];
   weekRangeLabel: string;
+  selectedWeek: string | null;
+  onWeekClick: (weekName: string) => void;
 }
 
-export default function InsightsPanel({ kpiOverview, weeklyTrends, weekRangeLabel }: InsightsPanelProps) {
+export default function InsightsPanel({
+  kpiOverview,
+  weeklyTrends,
+  weekRangeLabel,
+  selectedWeek,
+  onWeekClick,
+}: InsightsPanelProps) {
   const [chartView, setChartView] = useState<'trends' | 'distribution'>('trends');
   // Period averages over weeks that actually have a value (null weeks are
   // excluded rather than counted as 0).
@@ -86,7 +94,7 @@ export default function InsightsPanel({ kpiOverview, weeklyTrends, weekRangeLabe
                 </div>
               )}
             </div>
-            <span className="text-slate-500">{weekRangeLabel} · hover for weekly values</span>
+            <span className="text-slate-500">{weekRangeLabel} · click a week to drill in</span>
           </div>
 
           <div className="relative w-full h-[260px]">
@@ -98,6 +106,8 @@ export default function InsightsPanel({ kpiOverview, weeklyTrends, weekRangeLabe
                 slaTarget={kpiOverview?.target_phone_sla_pct ?? null}
                 csatTarget={kpiOverview?.target_csat_pct ?? null}
                 formatWeek={shortWeek}
+                selectedWeek={selectedWeek}
+                onWeekClick={onWeekClick}
               />
             )}
           </div>
@@ -113,14 +123,19 @@ export default function InsightsPanel({ kpiOverview, weeklyTrends, weekRangeLabe
                 </div>
               ))}
             </div>
-            <span className="text-slate-500">Volume per ISO-Week</span>
+            <span className="text-slate-500">Volume per ISO week · click a week to drill in</span>
           </div>
 
           <div className="relative w-full h-[260px]">
             {weeklyTrends.length === 0 ? (
               <div className="h-full flex items-center justify-center text-slate-500 text-xs">No volume data available</div>
             ) : (
-              <VolumeChart data={weeklyTrends} formatWeek={shortWeek} />
+              <VolumeChart
+                data={weeklyTrends}
+                formatWeek={shortWeek}
+                selectedWeek={selectedWeek}
+                onWeekClick={onWeekClick}
+              />
             )}
           </div>
         </div>

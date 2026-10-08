@@ -26,14 +26,16 @@ export async function GET(request: NextRequest) {
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
-    const { campaignId: selectedCampaignId, channel: channelFilter, sort: sortParam, page } = parsed.value;
+    const q = parsed.value;
+    const scope = { campaignId: q.campaignId, range: q.range };
+    const interactionFilters = { ...scope, channel: q.channel, search: q.search, week: q.week ?? undefined };
 
     const [campaigns, kpiOverview, weeklyTrends, interactions, targets] = await Promise.all([
       getCampaigns(session),
-      getKPIOverview(session, selectedCampaignId),
-      getWeeklyTrendData(session, selectedCampaignId),
-      getGranularInteractions(session, selectedCampaignId, channelFilter, page, PAGE_SIZE, sortParam),
-      getCampaignTargets(session, selectedCampaignId),
+      getKPIOverview(session, scope),
+      getWeeklyTrendData(session, scope),
+      getGranularInteractions(session, interactionFilters, q.page, PAGE_SIZE, q.sort),
+      getCampaignTargets(session, scope),
     ]);
 
     return NextResponse.json({

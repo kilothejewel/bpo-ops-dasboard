@@ -62,3 +62,10 @@
     animation: none !important;
   }
 }
+
+/* Recharts makes charts focusable for keyboard navigation. Keep the ring for
+   keyboard users, but don't draw it after a mouse click / tap. */
+.recharts-wrapper :focus:not(:focus-visible),
+.recharts-surface:focus:not(:focus-visible) {
+  outline: none;
+}

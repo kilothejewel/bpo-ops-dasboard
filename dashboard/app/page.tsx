@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { shortWeek } from '@/lib/format';
@@ -34,6 +34,9 @@ export default function Dashboard() {
       ? `${shortWeek(weeklyTrends[0].week_name)}–${shortWeek(weeklyTrends[weeklyTrends.length - 1].week_name)}`
       : '—';
 
+  const { updateFilters } = d;
+  const handleSearchChange = useCallback((search: string) => updateFilters({ search }), [updateFilters]);
+
   const breadcrumbLabel =
     role === 'management'
       ? filters.campaignId === 'ALL'
@@ -63,6 +66,8 @@ export default function Dashboard() {
         kpiOverview={d.kpiOverview}
         selectedCampaignId={filters.campaignId}
         selectedChannel={filters.channel}
+        selectedRange={filters.range}
+        handleRangeChange={(range) => d.updateFilters({ range, week: null })}
         handleCampaignChange={(campaignId) => d.updateFilters({ campaignId })}
         handleChannelChange={(channel) => d.updateFilters({ channel })}
       />
@@ -75,13 +80,23 @@ export default function Dashboard() {
 
       <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-6 space-y-6">
         <KpiCards kpiOverview={d.kpiOverview} weeklyTrends={weeklyTrends} weekRangeLabel={weekRangeLabel} />
-        <InsightsPanel kpiOverview={d.kpiOverview} weeklyTrends={weeklyTrends} weekRangeLabel={weekRangeLabel} />
+        <InsightsPanel
+          kpiOverview={d.kpiOverview}
+          weeklyTrends={weeklyTrends}
+          weekRangeLabel={weekRangeLabel}
+          selectedWeek={filters.week}
+          onWeekClick={(week) => d.updateFilters({ week: week === filters.week ? null : week })}
+        />
         <DataTables
           interactions={d.interactions}
           targets={d.targets}
           page={filters.page}
           sort={filters.sort}
           loading={d.loading}
+          search={filters.search}
+          week={filters.week}
+          handleSearchChange={handleSearchChange}
+          handleClearWeek={() => d.updateFilters({ week: null })}
           handleSortChange={(sort) => d.updateFilters({ sort })}
           handlePageChange={(page) => d.updateFilters({ page })}
         />

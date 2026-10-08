@@ -1,11 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Search, TableProperties, SlidersHorizontal, Columns3 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, TableProperties, SlidersHorizontal, Columns3, X } from 'lucide-react';
 
 import type { CampaignTarget, InteractionSort, PaginatedInteractions } from '@/lib/types';
+import { shortWeek } from '@/lib/format';
 import InteractionsTable from './InteractionsTable';
 import TargetsTable from './TargetsTable';
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 const SORT_OPTIONS: { value: InteractionSort; label: string }[] = [
   { value: 'opened_desc', label: 'Opened At (Desc)' },
@@ -21,8 +24,12 @@ interface DataTablesProps {
   page: number;
   sort: InteractionSort;
   loading: boolean;
+  search: string;
+  week: string | null;
   handleSortChange: (sort: InteractionSort) => void;
   handlePageChange: (page: number) => void;
+  handleSearchChange: (search: string) => void;
+  handleClearWeek: () => void;
 }
 
 export default function DataTables({
@@ -31,19 +38,28 @@ export default function DataTables({
   page,
   sort,
   loading,
+  search,
+  week,
   handleSortChange,
   handlePageChange,
+  handleSearchChange,
+  handleClearWeek,
 }: DataTablesProps) {
   const [activeTable, setActiveTable] = useState<'interactions' | 'targets'>('interactions');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // Local draft so typing stays responsive; the server query fires once
+  // the user pauses. Re-syncs if the filter changes from outside (e.g. URL).
+  const [searchDraft, setSearchDraft] = useState(search);
+  const [syncedSearch, setSyncedSearch] = useState(search);
+  if (search !== syncedSearch) {
+    setSyncedSearch(search);
+    setSearchDraft(search);
+  }
 
-  const filteredRows = useMemo(() => {
-    if (!searchQuery.trim()) return interactions.rows;
-    const q = searchQuery.toLowerCase();
-    return interactions.rows.filter((r) =>
-      [r.interaction_id, r.campaign_name, r.agent_name, r.channel].some((f) => f.toLowerCase().includes(q))
-    );
-  }, [interactions.rows, searchQuery]);
+  useEffect(() => {
+    if (searchDraft.trim() === search) return;
+    const id = setTimeout(() => handleSearchChange(searchDraft.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchDraft, search, handleSearchChange]);
 
   return (
     <section className="panel rounded-xl overflow-hidden">
@@ -80,13 +96,25 @@ export default function DataTables({
         </div>
 
         {activeTable === 'interactions' && (
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {week && (
+              <button
+                onClick={handleClearWeek}
+                title="Clear week drill-down"
+                className="h-8 px-2.5 rounded-lg border border-sky-700/70 bg-sky-950/50 text-sky-300 text-xs font-mono flex items-center gap-1.5 hover:border-sky-500 transition"
+              >
+                Week {shortWeek(week)}
+                <X className="w-3 h-3" />
+              </button>
+            )}
             <div className="relative w-56 sm:w-72">
               <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2" />
               <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter loaded rows…"
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                placeholder="Search ID, agent, campaign…"
+                aria-label="Search all interactions"
+                maxLength={64}
                 className="w-full bg-surface-0 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
               />
             </div>
@@ -119,7 +147,6 @@ export default function DataTables({
       {activeTable === 'interactions' ? (
         <InteractionsTable
           interactions={interactions}
-          filteredRows={filteredRows}
           page={page}
           loading={loading}
           handlePageChange={handlePageChange}

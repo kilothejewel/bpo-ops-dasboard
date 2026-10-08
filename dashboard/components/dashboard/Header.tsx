@@ -77,25 +77,12 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="hidden lg:flex items-center bg-surface-0 border border-slate-800/90 rounded-lg p-0.5 text-xs font-mono">
-            <button
-              disabled
-              title="Only the demo dataset's weekly window is available"
-              className="px-2.5 py-1 rounded-md text-slate-600 cursor-not-allowed"
-            >
-              Last 7d
-            </button>
-            <button className="px-2.5 py-1 rounded-md bg-surface-1 border border-sky-500/60 text-sky-400 font-semibold">
-              {weekRangeLabel}
-            </button>
-            <button
-              disabled
-              title="Only the demo dataset's weekly window is available"
-              className="px-2.5 py-1 rounded-md text-slate-600 cursor-not-allowed"
-            >
-              YTD
-            </button>
-          </div>
+          <span
+            className="hidden lg:inline-flex font-mono text-[11px] px-2.5 py-1 rounded-md bg-surface-0 border border-slate-800/90 text-sky-300"
+            title="ISO weeks currently in view"
+          >
+            {weekRangeLabel}
+          </span>
 
           <button
             onClick={handleRefresh}

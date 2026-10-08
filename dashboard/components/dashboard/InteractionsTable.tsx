@@ -18,7 +18,6 @@ function csatChipClasses(score: number): string {
 
 interface InteractionsTableProps {
   interactions: PaginatedInteractions;
-  filteredRows: InteractionRecord[];
   page: number;
   loading: boolean;
   handlePageChange: (page: number) => void;
@@ -26,7 +25,6 @@ interface InteractionsTableProps {
 
 export default function InteractionsTable({
   interactions,
-  filteredRows,
   page,
   loading,
   handlePageChange,
@@ -52,14 +50,14 @@ export default function InteractionsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 font-mono text-slate-300">
-            {filteredRows.length === 0 ? (
+            {interactions.rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 px-4 text-center text-slate-500">
                   No interactions match the current filters
                 </td>
               </tr>
             ) : (
-              filteredRows.map((row: InteractionRecord) => (
+              interactions.rows.map((row: InteractionRecord) => (
                 <tr key={row.interaction_id} className="hover:bg-slate-800/30 transition group even:bg-white/[0.015]">
                   <td className="py-2.5 px-4 text-slate-100 font-medium group-hover:text-sky-400 transition">{row.interaction_id}</td>
                   <td className="py-2.5 px-4">

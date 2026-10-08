@@ -11,6 +11,7 @@ import {
   CampaignTarget,
   InteractionSort,
   PaginatedInteractions,
+  DateRange,
 } from '@/lib/types';
 
 export const DEFAULT_MANAGEMENT_USER_ID = 'mgmt-exec';
@@ -20,6 +21,11 @@ export interface DashboardFilters {
   channel: string;
   sort: InteractionSort;
   page: number;
+  range: DateRange;
+  /** Server-side free-text search over interactions. */
+  search: string;
+  /** ISO week drill-down (e.g. "2026-W30"); narrows the interactions table only. */
+  week: string | null;
 }
 
 export const DEFAULT_FILTERS: DashboardFilters = {
@@ -27,17 +33,24 @@ export const DEFAULT_FILTERS: DashboardFilters = {
   channel: 'ALL',
   sort: 'opened_desc',
   page: 1,
+  range: 'all',
+  search: '',
+  week: null,
 };
 
 const EMPTY_INTERACTIONS: PaginatedInteractions = { rows: [], total: 0, page: 1, pageSize: 8 };
 
-function toSearchParams(f: DashboardFilters): URLSearchParams {
-  return new URLSearchParams({
+export function toSearchParams(f: DashboardFilters): URLSearchParams {
+  const params = new URLSearchParams({
     campaignId: f.campaignId,
     channel: f.channel,
     sort: f.sort,
     page: String(f.page),
+    range: f.range,
   });
+  if (f.search) params.set('search', f.search);
+  if (f.week) params.set('week', f.week);
+  return params;
 }
 
 /**

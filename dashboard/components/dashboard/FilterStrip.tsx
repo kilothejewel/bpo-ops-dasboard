@@ -2,7 +2,13 @@
 
 import { Database } from 'lucide-react';
 
-import type { CampaignOption, KPIOverviewStats, MockUserProfile, UserRole } from '@/lib/types';
+import type { CampaignOption, DateRange, KPIOverviewStats, MockUserProfile, UserRole } from '@/lib/types';
+
+const RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+  { value: 'latest', label: 'Latest wk' },
+  { value: 'last4', label: 'Last 4 wks' },
+  { value: 'all', label: 'All weeks' },
+];
 
 interface FilterStripProps {
   role: UserRole;
@@ -12,6 +18,8 @@ interface FilterStripProps {
   kpiOverview: KPIOverviewStats | null;
   selectedCampaignId: string;
   selectedChannel: string;
+  selectedRange: DateRange;
+  handleRangeChange: (range: DateRange) => void;
   handleCampaignChange: (campaignId: string) => void;
   handleChannelChange: (channel: string) => void;
 }
@@ -24,6 +32,8 @@ export default function FilterStrip({
   kpiOverview,
   selectedCampaignId,
   selectedChannel,
+  selectedRange,
+  handleRangeChange,
   handleCampaignChange,
   handleChannelChange,
 }: FilterStripProps) {
@@ -75,9 +85,26 @@ export default function FilterStrip({
             </select>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-0 border border-slate-800/80 text-[11px] text-slate-400 font-mono">
-            <span className="text-slate-500">ISO-8601:</span>
-            <span className="text-sky-300">Weekly cadence</span>
+          <div
+            role="group"
+            aria-label="Week range"
+            className="inline-flex items-center bg-surface-0 border border-slate-800 rounded-md p-0.5 font-mono text-[11px]"
+          >
+            {RANGE_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => handleRangeChange(o.value)}
+                disabled={loading}
+                aria-pressed={selectedRange === o.value}
+                className={`px-2 py-0.5 rounded transition disabled:opacity-50 ${
+                  selectedRange === o.value
+                    ? 'bg-surface-1 border border-sky-500/60 text-sky-300'
+                    : 'border border-transparent text-slate-400 hover:text-sky-300'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
         </div>
 

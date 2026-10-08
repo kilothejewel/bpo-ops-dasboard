@@ -8,6 +8,7 @@ import {
   CampaignTarget,
   PaginatedInteractions,
   InteractionSort,
+  DateRange,
 } from './types';
 
 export class MissingCampaignAccessError extends Error {
@@ -36,6 +37,91 @@ export function getEnforcedCampaignFilter(session: UserSession, requestedCampaig
   return null; // All campaigns
 }
 
+/** Collects parameterized WHERE conditions; `bind` returns the placeholder. */
+class SqlFilter {
+  readonly params: unknown[] = [];
+  private readonly conditions: string[] = [];
+
+  bind(value: unknown): string {
+    this.params.push(value);
+    return `$${this.params.length}`;
+  }
+
+  add(condition: string): void {
+    this.conditions.push(condition);
+  }
+
+  where(): string {
+    return this.conditions.length ? `WHERE ${this.conditions.join(' AND ')}` : '';
+  }
+}
+
+const RANGE_WEEKS: Record<Exclude<DateRange, 'all'>, number> = { latest: 1, last4: 4 };
+
+/**
+ * Restricts rows to the N most recent ISO weeks present in the data. Weeks
+ * are identified by (year, week) — not week_start_date, which in
+ * weekly_campaign_kpis is the first day with activity, not the Monday.
+ */
+function addRangeCondition(filter: SqlFilter, range: DateRange | undefined, yearCol: string, weekCol: string) {
+  if (!range || range === 'all') return;
+  const limit = filter.bind(RANGE_WEEKS[range]);
+  filter.add(`(${yearCol}, ${weekCol}) IN (
+    SELECT year, week FROM (SELECT DISTINCT year, week FROM public_marts.weekly_campaign_kpis) w
+    ORDER BY year DESC, week DESC LIMIT ${limit}
+  )`);
+}
+
+/** Escapes LIKE wildcards so user input is matched literally. */
+function likePattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+export interface ScopeOptions {
+  /** Requested campaign; ignored for standard sessions (see getEnforcedCampaignFilter). */
+  campaignId?: string;
+  range?: DateRange;
+}
+
+export interface InteractionFilterOptions extends ScopeOptions {
+  channel?: string;
+  /** Free-text match on interaction ID, agent, campaign or channel. */
+  search?: string;
+  /** ISO week name, e.g. "2026-W30" (chart drill-down). */
+  week?: string;
+}
+
+/** WHERE clause shared by the interactions table, CSV export and agent
+ * leaderboard, over fct_interactions f / dim_campaign c / dim_agent a / dim_date d. */
+function buildInteractionFilter(session: UserSession, opts: InteractionFilterOptions): SqlFilter {
+  const filter = new SqlFilter();
+  const enforcedCampaignId = getEnforcedCampaignFilter(session, opts.campaignId);
+  if (enforcedCampaignId) filter.add(`f.campaign_id = ${filter.bind(enforcedCampaignId)}`);
+  if (opts.channel && opts.channel !== 'ALL') filter.add(`f.channel = ${filter.bind(opts.channel)}`);
+  addRangeCondition(filter, opts.range, 'd.year', 'd.week');
+  if (opts.week) filter.add(`d.week_name = ${filter.bind(opts.week)}`);
+  if (opts.search) {
+    const p = filter.bind(likePattern(opts.search));
+    filter.add(`(f.interaction_id ILIKE ${p} OR a.agent_name ILIKE ${p} OR c.campaign_name ILIKE ${p} OR f.channel ILIKE ${p})`);
+  }
+  return filter;
+}
+
+const INTERACTION_FROM = `
+    FROM public_marts.fct_interactions f
+    JOIN public_marts.dim_campaign c ON f.campaign_id = c.campaign_id
+    JOIN public_marts.dim_agent a ON f.agent_id = a.agent_id
+    JOIN public_marts.dim_date d ON f.date_key = d.date_key`;
+
+/** WHERE clause for queries over weekly_campaign_kpis. */
+function buildKpiFilter(session: UserSession, opts: ScopeOptions): SqlFilter {
+  const filter = new SqlFilter();
+  const enforcedCampaignId = getEnforcedCampaignFilter(session, opts.campaignId);
+  if (enforcedCampaignId) filter.add(`campaign_id = ${filter.bind(enforcedCampaignId)}`);
+  addRangeCondition(filter, opts.range, 'year', 'week');
+  return filter;
+}
+
 export async function getCampaigns(session: UserSession): Promise<CampaignOption[]> {
   const enforcedId = getEnforcedCampaignFilter(session);
   let query = 'SELECT campaign_id, campaign_name, client_name FROM public_marts.dim_campaign';
@@ -51,18 +137,8 @@ export async function getCampaigns(session: UserSession): Promise<CampaignOption
   return result.rows;
 }
 
-export async function getKPIOverview(
-  session: UserSession, 
-  requestedCampaignId?: string
-): Promise<KPIOverviewStats> {
-  const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const params: unknown[] = [];
-  let campaignWhereClause = '';
-
-  if (enforcedCampaignId) {
-    campaignWhereClause = 'WHERE campaign_id = $1';
-    params.push(enforcedCampaignId);
-  }
+export async function getKPIOverview(session: UserSession, opts: ScopeOptions = {}): Promise<KPIOverviewStats> {
+  const filter = buildKpiFilter(session, opts);
 
   const query = `
     SELECT
@@ -95,10 +171,10 @@ export async function getKPIOverview(
       COALESCE(ROUND(AVG(avg_email_first_reply_mins)::NUMERIC, 2), 0)::FLOAT AS avg_email_first_reply_mins,
       COALESCE(ROUND(AVG(avg_email_resolution_mins)::NUMERIC, 2), 0)::FLOAT AS avg_email_resolution_mins
     FROM public_marts.weekly_campaign_kpis
-    ${campaignWhereClause}
+    ${filter.where()}
   `;
 
-  const result = await pool.query(query, params);
+  const result = await pool.query(query, filter.params);
   const row = result.rows[0] || {};
 
   return {
@@ -120,18 +196,8 @@ export async function getKPIOverview(
   };
 }
 
-export async function getWeeklyTrendData(
-  session: UserSession,
-  requestedCampaignId?: string
-): Promise<WeeklyKpiTrend[]> {
-  const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const params: unknown[] = [];
-  let campaignWhereClause = '';
-
-  if (enforcedCampaignId) {
-    campaignWhereClause = 'WHERE campaign_id = $1';
-    params.push(enforcedCampaignId);
-  }
+export async function getWeeklyTrendData(session: UserSession, opts: ScopeOptions = {}): Promise<WeeklyKpiTrend[]> {
+  const filter = buildKpiFilter(session, opts);
 
   // Aggregated across campaigns per week when no single campaign is enforced,
   // so the trend chart shows one line per week rather than one per
@@ -156,12 +222,12 @@ export async function getWeeklyTrendData(
       )::FLOAT AS actual_csat_pct,
       AVG(target_csat_pct)::FLOAT AS target_csat_pct
     FROM public_marts.weekly_campaign_kpis
-    ${campaignWhereClause}
+    ${filter.where()}
     GROUP BY year, week
     ORDER BY year ASC, week ASC
   `;
 
-  const result = await pool.query(query, params);
+  const result = await pool.query(query, filter.params);
   return result.rows;
 }
 
@@ -174,42 +240,7 @@ const SORT_CLAUSES: Record<InteractionSort, string> = {
   csat_asc: 'f.csat_score ASC NULLS LAST',
 };
 
-export async function getGranularInteractions(
-  session: UserSession,
-  requestedCampaignId?: string,
-  channelFilter?: string,
-  page: number = 1,
-  pageSize: number = 8,
-  sort: InteractionSort = 'opened_desc'
-): Promise<PaginatedInteractions> {
-  const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (enforcedCampaignId) {
-    params.push(enforcedCampaignId);
-    conditions.push(`f.campaign_id = $${params.length}`);
-  }
-
-  if (channelFilter && channelFilter !== 'ALL') {
-    params.push(channelFilter);
-    conditions.push(`f.channel = $${params.length}`);
-  }
-
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const orderClause = SORT_CLAUSES[sort] || SORT_CLAUSES.opened_desc;
-  const safePage = Math.max(1, Math.floor(page));
-  const offset = (safePage - 1) * pageSize;
-
-  params.push(pageSize);
-  const limitParamIndex = params.length;
-  params.push(offset);
-  const offsetParamIndex = params.length;
-
-  // COUNT(*) OVER() piggybacks the total row count onto the same query
-  // (one round trip) so the UI can render real pagination controls.
-  const query = `
-    SELECT
+const INTERACTION_COLUMNS = `
       f.interaction_id,
       f.campaign_id,
       c.campaign_name,
@@ -225,17 +256,33 @@ export async function getGranularInteractions(
       f.answer_time_seconds,
       f.first_reply_time_minutes::FLOAT,
       f.resolution_time_minutes::FLOAT,
-      f.is_call_answered_under_1min,
+      f.is_call_answered_under_1min`;
+
+export async function getGranularInteractions(
+  session: UserSession,
+  opts: InteractionFilterOptions = {},
+  page: number = 1,
+  pageSize: number = 8,
+  sort: InteractionSort = 'opened_desc'
+): Promise<PaginatedInteractions> {
+  const filter = buildInteractionFilter(session, opts);
+  const orderClause = SORT_CLAUSES[sort] || SORT_CLAUSES.opened_desc;
+  const safePage = Math.max(1, Math.floor(page));
+  const limit = filter.bind(pageSize);
+  const offset = filter.bind((safePage - 1) * pageSize);
+
+  // COUNT(*) OVER() piggybacks the total row count onto the same query
+  // (one round trip) so the UI can render real pagination controls.
+  const query = `
+    SELECT ${INTERACTION_COLUMNS},
       COUNT(*) OVER()::INT AS total_count
-    FROM public_marts.fct_interactions f
-    JOIN public_marts.dim_campaign c ON f.campaign_id = c.campaign_id
-    JOIN public_marts.dim_agent a ON f.agent_id = a.agent_id
-    ${whereClause}
-    ORDER BY ${orderClause}
-    LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
+    ${INTERACTION_FROM}
+    ${filter.where()}
+    ORDER BY ${orderClause}, f.interaction_id
+    LIMIT ${limit} OFFSET ${offset}
   `;
 
-  const result = await pool.query(query, params);
+  const result = await pool.query(query, filter.params);
   const total = result.rows[0]?.total_count ?? 0;
   const rows: InteractionRecord[] = result.rows.map(({ total_count: _total_count, ...rest }) => rest);
 
@@ -245,23 +292,19 @@ export async function getGranularInteractions(
 // Metrics where a HIGHER actual value is better (percentages: SLA %, CSAT %).
 const HIGHER_IS_BETTER = new Set(['calls_answered_under_1min_pct', 'csat_score_pct']);
 
-export async function getCampaignTargets(
-  session: UserSession,
-  requestedCampaignId?: string
-): Promise<CampaignTarget[]> {
-  const enforcedCampaignId = getEnforcedCampaignFilter(session, requestedCampaignId);
-  const params: unknown[] = [];
-  let whereClause = '';
-
-  if (enforcedCampaignId) {
-    whereClause = 'WHERE t.campaign_id = $1';
-    params.push(enforcedCampaignId);
-  }
+export async function getCampaignTargets(session: UserSession, opts: ScopeOptions = {}): Promise<CampaignTarget[]> {
+  const filter = new SqlFilter();
+  const enforcedCampaignId = getEnforcedCampaignFilter(session, opts.campaignId);
+  const rangeFilter = new SqlFilter();
+  addRangeCondition(rangeFilter, opts.range, 'year', 'week');
+  // The range subquery's placeholders are bound first so both clauses share
+  // one params array.
+  for (const p of rangeFilter.params) filter.bind(p);
+  if (enforcedCampaignId) filter.add(`t.campaign_id = ${filter.bind(enforcedCampaignId)}`);
 
   // Joins each target against a live aggregate of the SAME underlying
-  // computation used in weekly_campaign_kpis.sql (summed across all
-  // available weeks, not just the currently selected date range), so the
-  // "actual" column here is never a fabricated/decorative number.
+  // computation used in weekly_campaign_kpis.sql (summed over the selected
+  // week range), so the "actual" column is never a decorative number.
   const query = `
     WITH actuals AS (
       SELECT
@@ -271,6 +314,7 @@ export async function getCampaignTargets(
         ROUND(AVG(avg_email_first_reply_mins)::NUMERIC, 2) AS email_first_reply_mins,
         ROUND(AVG(avg_email_resolution_mins)::NUMERIC, 2) AS email_resolution_mins
       FROM public_marts.weekly_campaign_kpis
+      ${rangeFilter.where()}
       GROUP BY campaign_id
     )
     SELECT
@@ -286,11 +330,11 @@ export async function getCampaignTargets(
       END)::FLOAT AS actual_value
     FROM public_marts.campaign_targets t
     LEFT JOIN actuals a ON a.campaign_id = t.campaign_id
-    ${whereClause}
+    ${filter.where()}
     ORDER BY t.campaign_id ASC, t.metric_name ASC
   `;
 
-  const result = await pool.query(query, params);
+  const result = await pool.query(query, filter.params);
 
   return result.rows.map((row) => {
     const actual = row.actual_value === null || row.actual_value === undefined ? null : Number(row.actual_value);

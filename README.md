@@ -199,8 +199,8 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [ ] Export button downloads filtered interactions as CSV ([#2](https://github.com/kilothejewel/bpo-ops-dasboard/issues/2))
 - [ ] Share button copies a link that restores the current view ([#3](https://github.com/kilothejewel/bpo-ops-dasboard/issues/3))
 - [ ] Real dbt test status and versions instead of hardcoded text ([#4](https://github.com/kilothejewel/bpo-ops-dasboard/issues/4))
-- [ ] Working date-range filter ([#5](https://github.com/kilothejewel/bpo-ops-dasboard/issues/5))
-- [ ] Server-side search across all interactions ([#6](https://github.com/kilothejewel/bpo-ops-dasboard/issues/6))
+- [x] Working date-range filter ([#5](https://github.com/kilothejewel/bpo-ops-dasboard/issues/5))
+- [x] Server-side search across all interactions ([#6](https://github.com/kilothejewel/bpo-ops-dasboard/issues/6))
 - [ ] Column visibility toggle ([#7](https://github.com/kilothejewel/bpo-ops-dasboard/issues/7))
 
 **Code quality**
@@ -211,7 +211,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 
 **Features**
 - [ ] Docker Compose one-command setup ([#12](https://github.com/kilothejewel/bpo-ops-dasboard/issues/12))
-- [ ] Chart drill-down to a week ([#13](https://github.com/kilothejewel/bpo-ops-dasboard/issues/13))
+- [x] Chart drill-down to a week ([#13](https://github.com/kilothejewel/bpo-ops-dasboard/issues/13))
 - [ ] Agent leaderboard ([#14](https://github.com/kilothejewel/bpo-ops-dasboard/issues/14))
 - [ ] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))
 - [ ] Week-over-week change on KPI cards ([#16](https://github.com/kilothejewel/bpo-ops-dasboard/issues/16))

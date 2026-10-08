@@ -84,6 +84,10 @@ export interface InteractionRecord {
   is_call_answered_under_1min: number | null;
 }
 
+// Week window, always counted back from the most recent week in the data
+// (the demo dataset is a fixed historical window, so "today" isn't useful).
+export type DateRange = 'all' | 'last4' | 'latest';
+
 export type InteractionSort = 'opened_desc' | 'opened_asc' | 'delay_asc' | 'delay_desc' | 'csat_desc' | 'csat_asc';
 
 export interface PaginatedInteractions {
