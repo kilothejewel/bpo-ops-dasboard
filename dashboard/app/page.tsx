@@ -11,6 +11,8 @@ import KpiCards from '@/components/dashboard/KpiCards';
 import InsightsPanel from '@/components/dashboard/InsightsPanel';
 import DataTables from '@/components/dashboard/DataTables';
 import Footer from '@/components/dashboard/Footer';
+import AlertsBanner from '@/components/dashboard/AlertsBanner';
+import { findBreaches } from '@/lib/alerts';
 
 const AUTO_REFRESH_SECONDS = 60;
 
@@ -39,6 +41,8 @@ export default function Dashboard() {
     weeklyTrends.length > 0
       ? `${shortWeek(weeklyTrends[0].week_name)}–${shortWeek(weeklyTrends[weeklyTrends.length - 1].week_name)}`
       : '—';
+
+  const breaches = useMemo(() => findBreaches(d.targets, campaigns), [d.targets, campaigns]);
 
   const { updateFilters } = d;
   const handleSearchChange = useCallback((search: string) => updateFilters({ search }), [updateFilters]);
@@ -90,6 +94,7 @@ export default function Dashboard() {
       )}
 
       <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-6 space-y-6">
+        <AlertsBanner breaches={breaches} rangeLabel={weekRangeLabel} />
         <KpiCards
           kpiOverview={d.kpiOverview}
           weeklyTrends={weeklyTrends}

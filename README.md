@@ -103,6 +103,9 @@ All configuration is read from environment variables. Every variable has a **dev
 | `POSTGRES_PASSWORD` | generator, dbt, dashboard | `postgres` | **Yes — secret** | Database password |
 | `SESSION_SECRET` | dashboard (`lib/session.ts`) | public placeholder string | **Yes — secret** | HMAC key that signs the `bpo_session` cookie. Anyone who knows it can forge a session, so the fallback must never reach a shared environment. Generate with `openssl rand -base64 32`. |
 | `DBT_TARGET_DIR` | dashboard (`lib/dbt-status.ts`) | `../dbt_bpo/target` | Only if relocated | Where to find dbt's `run_results.json` for the live "dbt tests: N/N passing" badge and dbt version. Set it when the dashboard runs outside the repo checkout (e.g. a container with the artifacts mounted). |
+| `ALERTS_CRON_SECRET` | dashboard (`api/alerts/notify`) | unset (endpoint disabled) | **Yes — secret**, if using Slack alerts | Bearer token your scheduler sends to `POST /api/alerts/notify`. Generate with `openssl rand -base64 32`. |
+| `SLACK_WEBHOOK_URL` | dashboard (`api/alerts/notify`) | unset | **Yes — secret**, if using Slack alerts | Slack Incoming Webhook URL that below-target alerts are posted to. |
+| `DASHBOARD_PUBLIC_URL` | dashboard (`api/alerts/notify`) | unset | No | Link included in Slack alerts. |
 | `NODE_ENV` | dashboard | set by Next.js | Set automatically | `production` enables the cookie `Secure` flag and disables the dev-mode pg pool cache. Don't set it by hand. |
 
 **Where each component reads them from:**
@@ -214,7 +217,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [ ] Docker Compose one-command setup ([#12](https://github.com/kilothejewel/bpo-ops-dasboard/issues/12))
 - [x] Chart drill-down to a week ([#13](https://github.com/kilothejewel/bpo-ops-dasboard/issues/13))
 - [x] Agent leaderboard ([#14](https://github.com/kilothejewel/bpo-ops-dasboard/issues/14))
-- [ ] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))
+- [x] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))
 - [x] Week-over-week change on KPI cards ([#16](https://github.com/kilothejewel/bpo-ops-dasboard/issues/16))
 - [x] Auto-refresh toggle ([#17](https://github.com/kilothejewel/bpo-ops-dasboard/issues/17))
 - [ ] CI: lint, typecheck, tests, build and dbt build ([#18](https://github.com/kilothejewel/bpo-ops-dasboard/issues/18))
