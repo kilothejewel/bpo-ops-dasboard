@@ -1,0 +1,19 @@
+# Bronze -> Gold pipeline: synthetic data generator + dbt build.
+FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DBT_SEND_ANONYMOUS_USAGE_STATS=false
+
+RUN pip install "pandas>=2,<3" "faker>=25" "psycopg2-binary>=2.9,<3" "dbt-postgres>=1.8,<2"
+
+COPY scripts/ ./scripts/
+COPY dbt_bpo/ ./dbt_bpo/
+# Resolve dbt packages at build time so `docker compose up` doesn't need
+# hub.getdbt.com at runtime (skipped if packages are already vendored).
+RUN cd dbt_bpo && { [ -d dbt_packages/dbt_utils ] || dbt deps --profiles-dir .; }
+
+COPY docker/pipeline-entrypoint.sh ./pipeline-entrypoint.sh
+RUN chmod +x ./pipeline-entrypoint.sh
+ENTRYPOINT ["./pipeline-entrypoint.sh"]

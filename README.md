@@ -106,6 +106,7 @@ All configuration is read from environment variables. Every variable has a **dev
 | `ALERTS_CRON_SECRET` | dashboard (`api/alerts/notify`) | unset (endpoint disabled) | **Yes — secret**, if using Slack alerts | Bearer token your scheduler sends to `POST /api/alerts/notify`. Generate with `openssl rand -base64 32`. |
 | `SLACK_WEBHOOK_URL` | dashboard (`api/alerts/notify`) | unset | **Yes — secret**, if using Slack alerts | Slack Incoming Webhook URL that below-target alerts are posted to. |
 | `DASHBOARD_PUBLIC_URL` | dashboard (`api/alerts/notify`) | unset | No | Link included in Slack alerts. |
+| `DASHBOARD_PORT` / `POSTGRES_PUBLISH_PORT` | `docker-compose.yml` | `3000` / `5433` | No | Host ports Compose publishes the dashboard and database on. |
 | `NODE_ENV` | dashboard | set by Next.js | Set automatically | `production` enables the cookie `Secure` flag and disables the dev-mode pg pool cache. Don't set it by hand. |
 
 **Where each component reads them from:**
@@ -119,6 +120,26 @@ All configuration is read from environment variables. Every variable has a **dev
 ---
 
 ## 🚀 Step-by-Step Setup & Verification Guide
+
+### Quick start: Docker (one command)
+
+With Docker installed, this runs the whole pipeline (Postgres → synthetic data → `dbt build` with all tests → dashboard):
+
+```bash
+docker compose up --build
+```
+
+Then open [http://localhost:3000](http://localhost:3000). What happens:
+
+| Service | What it does |
+|---|---|
+| `db` | Postgres 16, published on host port `5433` (so it won't clash with a local Postgres). |
+| `pipeline` | Runs `scripts/generate_data.py`, then `dbt build` (12 models + 48 data tests), then exits. The dashboard only starts if this succeeds. |
+| `dashboard` | Production Next.js build. Reads dbt's `run_results.json` from a shared volume for the live test-status badge. |
+
+No configuration is required. If `SESSION_SECRET` isn't set, the dashboard container generates a random one at startup (sessions reset on restart). Any variable from [`.env.example`](.env.example) placed in a root `.env` is picked up by Compose. `docker compose down -v` stops everything and deletes the database volume.
+
+The manual steps below do the same thing without Docker.
 
 ### Prerequisites
 - Python 3.10+
@@ -214,7 +235,7 @@ Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each
 - [x] Fail fast when `SESSION_SECRET` is missing in production ([#11](https://github.com/kilothejewel/bpo-ops-dasboard/issues/11))
 
 **Features**
-- [ ] Docker Compose one-command setup ([#12](https://github.com/kilothejewel/bpo-ops-dasboard/issues/12))
+- [x] Docker Compose one-command setup ([#12](https://github.com/kilothejewel/bpo-ops-dasboard/issues/12))
 - [x] Chart drill-down to a week ([#13](https://github.com/kilothejewel/bpo-ops-dasboard/issues/13))
 - [x] Agent leaderboard ([#14](https://github.com/kilothejewel/bpo-ops-dasboard/issues/14))
 - [x] Below-target alerts: in-app banner, then Slack ([#15](https://github.com/kilothejewel/bpo-ops-dasboard/issues/15))

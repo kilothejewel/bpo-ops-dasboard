@@ -1,0 +1,10 @@
+# Build context for Dockerfile.pipeline (repo root).
+.git
+dashboard
+**/node_modules
+**/__pycache__
+.venv
+.env*
+dbt_bpo/target
+dbt_bpo/dbt_packages
+dbt_bpo/logs

@@ -1,0 +1,67 @@
+# One-command local stack: Postgres -> data generator + dbt build -> dashboard.
+#
+#   docker compose up --build        # then open http://localhost:3000
+#   docker compose down -v           # stop and delete the database volume
+#
+# Optional settings are read from a .env file next to this one (see
+# .env.example); everything has a working default.
+name: bpo-ops
+
+x-postgres-env: &postgres-env
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-bpo_db}
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bpo_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Published on 5433 by default so it doesn't clash with a local Postgres.
+    ports:
+      - "${POSTGRES_PUBLISH_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    environment:
+      <<: *postgres-env
+      DBT_TARGET_DIR: /dbt_target
+    volumes:
+      - dbt_target:/dbt_target
+    depends_on:
+      db:
+        condition: service_healthy
+
+  dashboard:
+    build: ./dashboard
+    environment:
+      <<: *postgres-env
+      DBT_TARGET_DIR: /dbt_target
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      ALERTS_CRON_SECRET: ${ALERTS_CRON_SECRET:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      DASHBOARD_PUBLIC_URL: ${DASHBOARD_PUBLIC_URL:-}
+    volumes:
+      - dbt_target:/dbt_target:ro
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  dbt_target:
