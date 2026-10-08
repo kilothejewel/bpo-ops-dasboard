@@ -289,6 +289,31 @@ export async function getGranularInteractions(
   return { rows, total, page: safePage, pageSize };
 }
 
+/** Hard cap so an export can't turn into an unbounded table dump. */
+export const EXPORT_ROW_LIMIT = 50_000;
+
+/** All interactions matching the filters (no pagination), for CSV export.
+ * Same RBAC + filter path as getGranularInteractions. Returns one extra row
+ * beyond the cap so callers can tell the result was truncated. */
+export async function getInteractionsForExport(
+  session: UserSession,
+  opts: InteractionFilterOptions = {},
+  sort: InteractionSort = 'opened_desc'
+): Promise<InteractionRecord[]> {
+  const filter = buildInteractionFilter(session, opts);
+  const orderClause = SORT_CLAUSES[sort] || SORT_CLAUSES.opened_desc;
+  const limit = filter.bind(EXPORT_ROW_LIMIT + 1);
+  const query = `
+    SELECT ${INTERACTION_COLUMNS}
+    ${INTERACTION_FROM}
+    ${filter.where()}
+    ORDER BY ${orderClause}, f.interaction_id
+    LIMIT ${limit}
+  `;
+  const result = await pool.query(query, filter.params);
+  return result.rows;
+}
+
 // Metrics where a HIGHER actual value is better (percentages: SLA %, CSAT %).
 const HIGHER_IS_BETTER = new Set(['calls_answered_under_1min_pct', 'csat_score_pct']);
 

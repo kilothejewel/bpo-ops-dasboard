@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useDashboardData } from '@/hooks/useDashboardData';
+import { toSearchParams, useDashboardData } from '@/hooks/useDashboardData';
 import { shortWeek } from '@/lib/format';
 import Header from '@/components/dashboard/Header';
 import FilterStrip from '@/components/dashboard/FilterStrip';
@@ -54,6 +54,7 @@ export default function Dashboard() {
         personas={d.personas}
         currentUserId={d.currentUserId}
         currentPersona={currentPersona}
+        exportHref={`/api/export?${toSearchParams(filters).toString()}`}
         handleRefresh={d.refresh}
         handlePersonaSelect={d.switchPersona}
       />

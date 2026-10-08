@@ -15,6 +15,7 @@ interface HeaderProps {
   personas: MockUserProfile[];
   currentUserId: string;
   currentPersona: MockUserProfile | undefined;
+  exportHref: string;
   handleRefresh: () => void;
   handlePersonaSelect: (userId: string) => void;
 }
@@ -27,10 +28,12 @@ export default function Header({
   personas,
   currentUserId,
   currentPersona,
+  exportHref,
   handleRefresh,
   handlePersonaSelect,
 }: HeaderProps) {
   const [personaMenuOpen, setPersonaMenuOpen] = useState(false);
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const personaMenuRef = useRef<HTMLDivElement>(null);
   const standardPersonas = personas.filter((p) => p.role === 'standard');
 
@@ -43,6 +46,19 @@ export default function Header({
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
+
+  // The URL always mirrors the active filters (see useDashboardData), so
+  // sharing is just copying it. Access still comes from the recipient's own
+  // session, so a link can never widen what they are allowed to see.
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareState('copied');
+    } catch {
+      setShareState('failed');
+    }
+    setTimeout(() => setShareState('idle'), 2000);
+  };
 
   const selectPersona = (userId: string) => {
     setPersonaMenuOpen(false);
@@ -93,14 +109,27 @@ export default function Header({
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />
           </button>
 
-          <div className="hidden sm:flex items-center gap-1.5 border-l border-slate-800 pl-3">
-            <button className="h-7 px-2.5 rounded-lg border border-sky-900/60 bg-surface-0 hover:border-sky-500/60 text-xs font-medium flex items-center gap-1.5 transition">
+          <div className="flex items-center gap-1.5 border-l border-slate-800 pl-2 sm:pl-3">
+            <a
+              href={exportHref}
+              download
+              aria-label="Export CSV"
+              title="Download interactions matching the current filters as CSV"
+              className="h-7 px-2.5 rounded-lg border border-sky-900/60 bg-surface-0 hover:border-sky-500/60 text-xs font-medium flex items-center gap-1.5 transition"
+            >
               <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-slate-200">Export</span>
-            </button>
-            <button className="h-7 px-2.5 rounded-lg bg-surface-0 border border-sky-500 hover:border-sky-400 text-xs font-semibold flex items-center gap-1.5 transition">
+              <span className="hidden sm:inline text-slate-200">Export</span>
+            </a>
+            <button
+              onClick={copyShareLink}
+              aria-label="Share link to this view"
+              title="Copy a link to this view"
+              className="h-7 px-2.5 rounded-lg bg-surface-0 border border-sky-500 hover:border-sky-400 text-xs font-semibold flex items-center gap-1.5 transition"
+            >
               <Share2 className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-sky-300">Share</span>
+              <span className="hidden sm:inline text-sky-300" aria-live="polite">
+                {shareState === 'copied' ? 'Link copied' : shareState === 'failed' ? 'Copy failed' : 'Share'}
+              </span>
             </button>
           </div>
 

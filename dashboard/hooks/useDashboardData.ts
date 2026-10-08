@@ -13,6 +13,7 @@ import {
   PaginatedInteractions,
   DateRange,
 } from '@/lib/types';
+import { parseDashboardQuery } from '@/lib/query-params';
 
 export const DEFAULT_MANAGEMENT_USER_ID = 'mgmt-exec';
 
@@ -51,6 +52,29 @@ export function toSearchParams(f: DashboardFilters): URLSearchParams {
   if (f.search) params.set('search', f.search);
   if (f.week) params.set('week', f.week);
   return params;
+}
+
+/** URL query for a filter set, omitting defaults so links stay short. */
+export function toShareParams(f: DashboardFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  (Object.keys(DEFAULT_FILTERS) as (keyof DashboardFilters)[]).forEach((key) => {
+    const value = f[key];
+    if (value !== null && value !== DEFAULT_FILTERS[key]) params.set(key, String(value));
+  });
+  return params;
+}
+
+/** Filters encoded in the page URL (a shared link or a reload). Uses the
+ * same validator as the API; anything invalid falls back to defaults. */
+function filtersFromLocation(): DashboardFilters {
+  if (typeof window === 'undefined') return DEFAULT_FILTERS;
+  const parsed = parseDashboardQuery(new URLSearchParams(window.location.search));
+  return parsed.ok ? { ...parsed.value } : DEFAULT_FILTERS;
+}
+
+function syncLocation(f: DashboardFilters) {
+  const qs = toShareParams(f).toString();
+  window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
 }
 
 /**
@@ -108,7 +132,7 @@ export function useDashboardData() {
   }, []);
 
   const establishSession = useCallback(
-    async (userId: string, f: DashboardFilters) => {
+    async (userId: string, f: DashboardFilters, keepPage = false) => {
       setLoading(true);
       setError(null);
       try {
@@ -124,9 +148,10 @@ export function useDashboardData() {
           setRole(data.session.role);
           setCurrentUserId(data.session.userId || userId);
         }
-        const next = { ...f, page: 1 };
+        const next = keepPage ? f : { ...f, page: 1 };
         filtersRef.current = next;
         setFilters(next);
+        syncLocation(next);
         await fetchData(next);
       } catch (err: unknown) {
         console.error(err);
@@ -157,7 +182,7 @@ export function useDashboardData() {
       } catch (err) {
         console.error('Failed to load personas', err);
       }
-      establishSession(DEFAULT_MANAGEMENT_USER_ID, DEFAULT_FILTERS);
+      establishSession(DEFAULT_MANAGEMENT_USER_ID, filtersFromLocation(), true);
     })();
   }, [establishSession]);
 
@@ -168,6 +193,7 @@ export function useDashboardData() {
       const next = { ...filtersRef.current, ...patch, page: patch.page ?? 1 };
       filtersRef.current = next;
       setFilters(next);
+      syncLocation(next);
       fetchData(next);
     },
     [fetchData]

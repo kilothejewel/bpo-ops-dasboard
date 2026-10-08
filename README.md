@@ -196,8 +196,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. The dashboa
 Tracked in [#1](https://github.com/kilothejewel/bpo-ops-dasboard/issues/1); each item links to its issue. Boxes are ticked as items land.
 
 **Quick wins: replace placeholders with working features**
-- [ ] Export button downloads filtered interactions as CSV ([#2](https://github.com/kilothejewel/bpo-ops-dasboard/issues/2))
-- [ ] Share button copies a link that restores the current view ([#3](https://github.com/kilothejewel/bpo-ops-dasboard/issues/3))
+- [x] Export button downloads filtered interactions as CSV ([#2](https://github.com/kilothejewel/bpo-ops-dasboard/issues/2))
+- [x] Share button copies a link that restores the current view ([#3](https://github.com/kilothejewel/bpo-ops-dasboard/issues/3))
 - [ ] Real dbt test status and versions instead of hardcoded text ([#4](https://github.com/kilothejewel/bpo-ops-dasboard/issues/4))
 - [x] Working date-range filter ([#5](https://github.com/kilothejewel/bpo-ops-dasboard/issues/5))
 - [x] Server-side search across all interactions ([#6](https://github.com/kilothejewel/bpo-ops-dasboard/issues/6))
