@@ -47,3 +47,47 @@ export function meanOf(values: (number | null)[]): number | null {
   const present = values.filter((v): v is number => v !== null);
   return present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
 }
+
+export type DeltaMode = 'points' | 'percent' | 'absolute';
+
+export interface Delta {
+  /** Signed change: percentage points, relative %, or raw units per `mode`. */
+  value: number;
+  direction: 'up' | 'down' | 'flat';
+  /** null when the metric has no better direction. */
+  isGood: boolean | null;
+  label: string;
+}
+
+/**
+ * Change from `previous` to `current`, formatted for a KPI card.
+ * `points` = difference of two percentages ("+1.20 pts"), `percent` =
+ * relative change ("-5.5%"), `absolute` = raw difference with a unit.
+ * Returns null when either side is missing or a relative change would
+ * divide by zero.
+ */
+export function computeDelta(
+  current: number | null,
+  previous: number | null,
+  mode: DeltaMode,
+  opts: { higherIsBetter?: boolean; unit?: string; digits?: number } = {}
+): Delta | null {
+  if (current === null || previous === null) return null;
+  const digits = opts.digits ?? (mode === 'percent' ? 1 : 2);
+  let value: number;
+  if (mode === 'percent') {
+    if (previous === 0) return null;
+    value = ((current - previous) / previous) * 100;
+  } else {
+    value = current - previous;
+  }
+  const rounded = Number(value.toFixed(digits));
+  const direction = rounded > 0 ? 'up' : rounded < 0 ? 'down' : 'flat';
+  const isGood =
+    opts.higherIsBetter === undefined || direction === 'flat'
+      ? null
+      : (direction === 'up') === opts.higherIsBetter;
+  const sign = rounded > 0 ? '+' : '';
+  const suffix = mode === 'points' ? ' pts' : mode === 'percent' ? '%' : opts.unit ? ` ${opts.unit}` : '';
+  return { value: rounded, direction, isGood, label: `${sign}${rounded.toFixed(digits)}${suffix}` };
+}

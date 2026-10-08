@@ -81,7 +81,12 @@ export default function Dashboard() {
       )}
 
       <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-6 space-y-6">
-        <KpiCards kpiOverview={d.kpiOverview} weeklyTrends={weeklyTrends} weekRangeLabel={weekRangeLabel} />
+        <KpiCards
+          kpiOverview={d.kpiOverview}
+          weeklyTrends={weeklyTrends}
+          weekRangeLabel={weekRangeLabel}
+          weekOverWeek={d.weekOverWeek}
+        />
         <InsightsPanel
           kpiOverview={d.kpiOverview}
           weeklyTrends={weeklyTrends}

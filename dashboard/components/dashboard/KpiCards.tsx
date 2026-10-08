@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react';
 
-import type { KPIOverviewStats, WeeklyKpiTrend } from '@/lib/types';
-import { formatPct } from '@/lib/format';
+import type { KPIOverviewStats, WeekOverWeek, WeeklyKpiTrend } from '@/lib/types';
+import { computeDelta, formatPct } from '@/lib/format';
+import WowDelta from './WowDelta';
 import Sparkline from '@/components/charts/Sparkline';
 import { TREND_COLORS } from '@/components/charts/TrendChart';
 
@@ -11,12 +12,34 @@ interface KpiCardsProps {
   kpiOverview: KPIOverviewStats | null;
   weeklyTrends: WeeklyKpiTrend[];
   weekRangeLabel: string;
+  weekOverWeek: WeekOverWeek | null;
 }
 
-export default function KpiCards({ kpiOverview, weeklyTrends, weekRangeLabel }: KpiCardsProps) {
+export default function KpiCards({ kpiOverview, weeklyTrends, weekRangeLabel, weekOverWeek }: KpiCardsProps) {
   const slaSeries = useMemo(() => weeklyTrends.map((w) => w.actual_phone_sla_pct), [weeklyTrends]);
   const csatSeries = useMemo(() => weeklyTrends.map((w) => w.actual_csat_pct), [weeklyTrends]);
   const volumeSeries = useMemo(() => weeklyTrends.map((w) => w.total_interactions), [weeklyTrends]);
+
+  const wow = weekOverWeek;
+  const wowLine = (delta: ReturnType<typeof computeDelta>) =>
+    wow ? (
+      <WowDelta
+        delta={delta}
+        currentWeek={wow.current.week_name}
+        previousWeek={wow.previous.week_name}
+        skippedPartialWeek={wow.skippedPartialWeek}
+      />
+    ) : null;
+  const slaWow = wow && computeDelta(wow.current.phone_sla_pct, wow.previous.phone_sla_pct, 'points', { higherIsBetter: true });
+  const csatWow = wow && computeDelta(wow.current.csat_pct, wow.previous.csat_pct, 'points', { higherIsBetter: true });
+  const replyWow =
+    wow &&
+    computeDelta(wow.current.email_first_reply_mins, wow.previous.email_first_reply_mins, 'absolute', {
+      higherIsBetter: false,
+      unit: 'min 1st reply',
+    });
+  // Volume has no "better" direction for an ops team, so it stays neutral.
+  const volumeWow = wow && computeDelta(wow.current.total_interactions, wow.previous.total_interactions, 'percent');
 
   const phoneDelta =
     kpiOverview && kpiOverview.target_phone_sla_pct !== null
@@ -62,6 +85,7 @@ export default function KpiCards({ kpiOverview, weeklyTrends, weekRangeLabel }: 
             <Sparkline values={slaSeries} color={TREND_COLORS.sla} />
           </div>
         </div>
+        {wowLine(slaWow)}
         <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
           <span>
             Target:{' '}
@@ -96,6 +120,7 @@ export default function KpiCards({ kpiOverview, weeklyTrends, weekRangeLabel }: 
             <Sparkline values={csatSeries} color={TREND_COLORS.csat} />
           </div>
         </div>
+        {wowLine(csatWow)}
         <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
           <span>
             Target:{' '}
@@ -137,6 +162,7 @@ export default function KpiCards({ kpiOverview, weeklyTrends, weekRangeLabel }: 
             </div>
           </div>
         </div>
+        {wowLine(replyWow)}
         <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
           <span>Reported as: <span className="text-slate-200">Average</span></span>
           <span>
@@ -161,6 +187,7 @@ export default function KpiCards({ kpiOverview, weeklyTrends, weekRangeLabel }: 
             <Sparkline values={volumeSeries} color="#94a3b8" />
           </div>
         </div>
+        {wowLine(volumeWow)}
         <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400 font-mono">
           <span>Breakdown:</span>
           <span className="text-slate-300">{volumeBreakdown || '—'}</span>

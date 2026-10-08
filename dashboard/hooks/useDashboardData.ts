@@ -13,6 +13,7 @@ import {
   PaginatedInteractions,
   DateRange,
   DashboardMeta,
+  WeekOverWeek,
 } from '@/lib/types';
 import { parseDashboardQuery } from '@/lib/query-params';
 
@@ -98,6 +99,7 @@ export function useDashboardData() {
   const [weeklyTrends, setWeeklyTrends] = useState<WeeklyKpiTrend[]>([]);
   const [interactions, setInteractions] = useState<PaginatedInteractions>(EMPTY_INTERACTIONS);
   const [targets, setTargets] = useState<CampaignTarget[]>([]);
+  const [weekOverWeek, setWeekOverWeek] = useState<WeekOverWeek | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
@@ -123,6 +125,7 @@ export function useDashboardData() {
       setWeeklyTrends(data.weeklyTrends || []);
       setInteractions(data.interactions || EMPTY_INTERACTIONS);
       setTargets(data.targets || []);
+      setWeekOverWeek(data.weekOverWeek ?? null);
       setLastFetchedAt(new Date());
     } catch (err: unknown) {
       if (seq !== requestSeq.current) return;
@@ -243,6 +246,7 @@ export function useDashboardData() {
     weeklyTrends,
     interactions,
     targets,
+    weekOverWeek,
     loading,
     error,
     lastFetchedAt,

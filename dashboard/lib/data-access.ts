@@ -9,6 +9,8 @@ import {
   PaginatedInteractions,
   InteractionSort,
   DateRange,
+  WeekOverWeek,
+  WeekSnapshot,
 } from './types';
 
 export class MissingCampaignAccessError extends Error {
@@ -229,6 +231,73 @@ export async function getWeeklyTrendData(session: UserSession, opts: ScopeOption
 
   const result = await pool.query(query, filter.params);
   return result.rows;
+}
+
+/** A week counts as complete once it has activity on all 7 days. */
+const DAYS_IN_COMPLETE_WEEK = 7;
+
+/**
+ * Latest complete week vs the one before, for the KPI cards' change line.
+ * The newest week in the data is often partial (in the demo data, W36 has a
+ * single day), and comparing it directly would show a misleading drop, so
+ * it is skipped and reported as `skippedPartialWeek`.
+ */
+export async function getWeekOverWeek(
+  session: UserSession,
+  opts: Pick<ScopeOptions, 'campaignId'> = {}
+): Promise<WeekOverWeek | null> {
+  const enforcedCampaignId = getEnforcedCampaignFilter(session, opts.campaignId);
+  const params: unknown[] = [];
+  let kpiWhere = '';
+  let factWhere = '';
+  if (enforcedCampaignId) {
+    params.push(enforcedCampaignId);
+    kpiWhere = 'WHERE campaign_id = $1';
+    factWhere = 'WHERE f.campaign_id = $1';
+  }
+
+  const query = `
+    WITH weeks AS (
+      SELECT
+        year,
+        week,
+        MIN(week_name) AS week_name,
+        SUM(total_interactions)::INT AS total_interactions,
+        ROUND((SUM(calls_answered_under_1min_count)::NUMERIC / NULLIF(SUM(total_calls_evaluated), 0)) * 100.0, 2)::FLOAT AS phone_sla_pct,
+        ROUND((SUM(csat_satisfied_count)::NUMERIC / NULLIF(SUM(csat_total_responses), 0)) * 100.0, 2)::FLOAT AS csat_pct,
+        ROUND(AVG(avg_email_first_reply_mins)::NUMERIC, 2)::FLOAT AS email_first_reply_mins
+      FROM public_marts.weekly_campaign_kpis
+      ${kpiWhere}
+      GROUP BY year, week
+    ),
+    days AS (
+      SELECT d.year, d.week, COUNT(DISTINCT d.date)::INT AS days_with_data
+      FROM public_marts.fct_interactions f
+      JOIN public_marts.dim_date d ON f.date_key = d.date_key
+      ${factWhere}
+      GROUP BY d.year, d.week
+    )
+    SELECT w.*, COALESCE(dy.days_with_data, 0) AS days_with_data
+    FROM weeks w
+    LEFT JOIN days dy ON dy.year = w.year AND dy.week = w.week
+    ORDER BY w.year DESC, w.week DESC
+    LIMIT 3
+  `;
+
+  const result = await pool.query(query, params);
+  const rows: (WeekSnapshot & { year: number; week: number })[] = result.rows;
+  if (rows.length === 0) return null;
+
+  const latestIsPartial = rows[0].days_with_data < DAYS_IN_COMPLETE_WEEK;
+  const [current, previous] = latestIsPartial ? rows.slice(1, 3) : rows.slice(0, 2);
+  if (!current || !previous) return null;
+
+  const strip = ({ year: _year, week: _week, ...snap }: WeekSnapshot & { year: number; week: number }) => snap;
+  return {
+    current: strip(current),
+    previous: strip(previous),
+    skippedPartialWeek: latestIsPartial ? rows[0].week_name : null,
+  };
 }
 
 const SORT_CLAUSES: Record<InteractionSort, string> = {

@@ -5,6 +5,7 @@ import {
   getWeeklyTrendData, 
   getGranularInteractions, 
   getCampaignTargets,
+  getWeekOverWeek,
   MissingCampaignAccessError,
 } from '@/lib/data-access';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
@@ -30,12 +31,13 @@ export async function GET(request: NextRequest) {
     const scope = { campaignId: q.campaignId, range: q.range };
     const interactionFilters = { ...scope, channel: q.channel, search: q.search, week: q.week ?? undefined };
 
-    const [campaigns, kpiOverview, weeklyTrends, interactions, targets] = await Promise.all([
+    const [campaigns, kpiOverview, weeklyTrends, interactions, targets, weekOverWeek] = await Promise.all([
       getCampaigns(session),
       getKPIOverview(session, scope),
       getWeeklyTrendData(session, scope),
       getGranularInteractions(session, interactionFilters, q.page, PAGE_SIZE, q.sort),
       getCampaignTargets(session, scope),
+      getWeekOverWeek(session, { campaignId: q.campaignId }),
     ]);
 
     return NextResponse.json({
@@ -45,6 +47,7 @@ export async function GET(request: NextRequest) {
       weeklyTrends,
       interactions,
       targets,
+      weekOverWeek,
     });
   } catch (error: unknown) {
     if (error instanceof MissingCampaignAccessError) {

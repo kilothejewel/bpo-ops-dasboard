@@ -65,6 +65,24 @@ export interface WeeklyKpiTrend {
   target_csat_pct: number | null;
 }
 
+/** Latest complete ISO week vs the week before it, within the session's
+ * campaign scope. Independent of the selected range. */
+export interface WeekOverWeek {
+  current: WeekSnapshot;
+  previous: WeekSnapshot;
+  /** Weeks after `current` that were skipped because they are partial. */
+  skippedPartialWeek: string | null;
+}
+
+export interface WeekSnapshot {
+  week_name: string;
+  total_interactions: number;
+  phone_sla_pct: number | null;
+  csat_pct: number | null;
+  email_first_reply_mins: number | null;
+  days_with_data: number;
+}
+
 export interface InteractionRecord {
   interaction_id: string;
   campaign_id: string;
